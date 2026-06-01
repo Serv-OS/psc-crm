@@ -182,6 +182,31 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
 
         <div className="border-t border-bdr my-4"/>
 
+        <div className="px-2 mb-2">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">CRM</div>
+        </div>
+
+        {[
+          { key: 'companies', icon: '\u{1F3E2}', label: 'Companies' },
+          { key: 'contacts',  icon: '\u{1F464}', label: 'Contacts' },
+          { key: 'locations', icon: '\u{1F4CD}', label: 'Locations' },
+        ].map(item => (
+          <button key={item.key} onClick={() => setView(item.key)}
+            className={`w-full px-3 py-2 text-left rounded-lg text-sm flex items-center gap-2 ${
+              view === item.key || view === item.key.slice(0, -1) + '_detail'
+                ? 'bg-card text-paper' : 'text-muted hover:bg-card hover:text-paper'
+            }`}>
+            <span>{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+
+        <div className="border-t border-bdr my-4"/>
+
+        <div className="px-2 mb-2">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">Backlog</div>
+        </div>
+
         {activeProject && canWrite && (
           <button onClick={() => setView('features')}
             className={`w-full px-3 py-2 text-left rounded-lg text-sm flex items-center gap-2 ${
@@ -191,6 +216,8 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
             <span>Features</span>
           </button>
         )}
+
+        <div className="border-t border-bdr my-4"/>
 
         {isOwner && (
           <button onClick={() => setView('users')}

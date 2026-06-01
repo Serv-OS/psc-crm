@@ -5,6 +5,12 @@ import Board from './Board.jsx';
 import UsersPanel from './UsersPanel.jsx';
 import FeaturesPanel from './FeaturesPanel.jsx';
 import ItemDetail from './ItemDetail.jsx';
+import CompanyList from './crm/CompanyList.jsx';
+import CompanyDetail from './crm/CompanyDetail.jsx';
+import ContactList from './crm/ContactList.jsx';
+import ContactDetail from './crm/ContactDetail.jsx';
+import LocationList from './crm/LocationList.jsx';
+import LocationDetail from './crm/LocationDetail.jsx';
 
 export default function Shell({ session }) {
   const [profile, setProfile]   = useState(null);
@@ -12,6 +18,7 @@ export default function Shell({ session }) {
   const [activeProject, setActiveProject] = useState(null);
   const [view, setView]         = useState('board');
   const [openItem, setOpenItem] = useState(null);
+  const [detailId, setDetailId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -38,12 +45,47 @@ export default function Shell({ session }) {
     try {
       await supabase.auth.signOut({ scope: 'global' });
     } catch {
-      // If global signout fails (e.g. network), force local cleanup
       await supabase.auth.signOut({ scope: 'local' });
     }
   };
 
-  if (!profile) return <div className="h-full flex items-center justify-center text-muted text-sm">Loading profile…</div>;
+  // Navigate to a CRM record detail view
+  const navigateTo = (type, id) => {
+    if (type === 'company') { setView('company_detail'); setDetailId(id); }
+    else if (type === 'contact') { setView('contact_detail'); setDetailId(id); }
+    else if (type === 'location') { setView('location_detail'); setDetailId(id); }
+  };
+
+  if (!profile) return <div className="h-full flex items-center justify-center text-muted text-sm">Loading profile...</div>;
+
+  const renderMain = () => {
+    switch (view) {
+      case 'users':
+        return <UsersPanel profile={profile} />;
+      case 'features':
+        return activeProject ? <FeaturesPanel project={activeProject} profile={profile} /> : null;
+      case 'companies':
+        return <CompanyList profile={profile} onSelect={(id) => navigateTo('company', id)} />;
+      case 'company_detail':
+        return <CompanyDetail companyId={detailId} profile={profile}
+          onClose={() => setView('companies')} onNavigate={navigateTo} />;
+      case 'contacts':
+        return <ContactList profile={profile} onSelect={(id) => navigateTo('contact', id)} />;
+      case 'contact_detail':
+        return <ContactDetail contactId={detailId} profile={profile}
+          onClose={() => setView('contacts')} onNavigate={navigateTo} />;
+      case 'locations':
+        return <LocationList profile={profile} onSelect={(id) => navigateTo('location', id)} onNavigate={navigateTo} />;
+      case 'location_detail':
+        return <LocationDetail locationId={detailId} profile={profile}
+          onClose={() => setView('locations')} onNavigate={navigateTo} />;
+      case 'board':
+      default:
+        return activeProject
+          ? <Board project={activeProject} profile={profile} onOpenItem={setOpenItem} />
+          : <div className="h-full flex items-center justify-center text-muted text-sm">No projects yet. Create one from the sidebar.</div>;
+    }
+  };
 
   return (
     <div className="h-full flex">
@@ -58,17 +100,7 @@ export default function Shell({ session }) {
         onRefresh={load}
       />
       <main className="flex-1 min-w-0 overflow-hidden">
-        {view === 'users' ? (
-          <UsersPanel profile={profile}/>
-        ) : view === 'features' && activeProject ? (
-          <FeaturesPanel project={activeProject} profile={profile}/>
-        ) : activeProject ? (
-          <Board project={activeProject} profile={profile} onOpenItem={setOpenItem}/>
-        ) : (
-          <div className="h-full flex items-center justify-center text-muted text-sm">
-            No projects yet. Create one from the sidebar.
-          </div>
-        )}
+        {renderMain()}
       </main>
       {openItem && (
         <ItemDetail
