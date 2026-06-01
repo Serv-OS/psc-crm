@@ -11,6 +11,10 @@ import ContactList from './crm/ContactList.jsx';
 import ContactDetail from './crm/ContactDetail.jsx';
 import LocationList from './crm/LocationList.jsx';
 import LocationDetail from './crm/LocationDetail.jsx';
+import TaskList from './crm/TaskList.jsx';
+import TaskDetail from './crm/TaskDetail.jsx';
+import ProjectList from './crm/ProjectList.jsx';
+import ProjectDetail from './crm/ProjectDetail.jsx';
 
 export default function Shell({ session }) {
   const [profile, setProfile]   = useState(null);
@@ -79,6 +83,16 @@ export default function Shell({ session }) {
       case 'location_detail':
         return <LocationDetail locationId={detailId} profile={profile}
           onClose={() => setView('locations')} onNavigate={navigateTo} />;
+      case 'tasks':
+        return <TaskList profile={profile} onSelect={(id) => { setView('task_detail'); setDetailId(id); }} />;
+      case 'task_detail':
+        return <TaskDetail taskId={detailId} profile={profile} onClose={() => setView('tasks')} />;
+      case 'projects':
+        return <ProjectList profile={profile} onSelect={(id) => { setView('project_detail'); setDetailId(id); }} />;
+      case 'project_detail':
+        return <ProjectDetail projectId={detailId} profile={profile}
+          onClose={() => setView('projects')}
+          onSelectTask={(id) => { setView('task_detail'); setDetailId(id); }} />;
       case 'board':
       default:
         return activeProject
