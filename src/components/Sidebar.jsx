@@ -75,7 +75,7 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
   };
 
   return (
-    <aside className="w-64 shrink-0 bg-ink-soft border-r border-bdr flex flex-col">
+    <aside className="w-64 shrink-0 glass border-r border-bdr flex flex-col">
       <div className="px-4 py-4 border-b border-bdr">
         <LogoLockup size={24}/>
         <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-dim mt-1.5">Posupject</div>

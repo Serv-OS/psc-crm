@@ -31,27 +31,27 @@ export default function Auth() {
         </div>
 
         {sent ? (
-          <div className="bg-ink-soft border border-bdr rounded-xl p-6 text-center">
-            <div className="text-2xl mb-3">&#x2709;&#xFE0F;</div>
-            <div className="text-sm text-paper font-semibold mb-1">Check your email</div>
-            <div className="text-xs text-muted">We sent a magic link to <span className="text-paper">{email}</span></div>
+          <div className="glass-raised glass-shimmer rounded-2xl p-8 text-center">
+            <div className="text-3xl mb-3">&#x2709;&#xFE0F;</div>
+            <div className="text-base text-paper font-semibold mb-1">Check your email</div>
+            <div className="text-sm text-muted">We sent a magic link to <span className="text-paper font-medium">{email}</span></div>
           </div>
         ) : (
-          <form onSubmit={send} className="space-y-3">
+          <form onSubmit={send} className="glass-raised glass-shimmer rounded-2xl p-6 space-y-4">
             <input
               type="email" required autoFocus
               value={email} onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-4 py-3 bg-ink-soft border border-bdr rounded-lg text-paper placeholder-dim text-sm focus:outline-none focus:border-ember"
+              className="w-full px-4 py-3 bg-ink/50 border border-bdr rounded-xl text-paper placeholder-dim text-sm focus:outline-none focus:border-ember backdrop-blur-sm"
             />
             <button
               type="submit" disabled={sending || !email}
-              className="w-full px-4 py-3 bg-ember text-ink font-semibold rounded-lg text-sm disabled:opacity-50 hover:bg-ember-deep transition"
+              className="w-full px-4 py-3 btn-glass rounded-xl text-sm disabled:opacity-50"
             >
-              {sending ? 'Sending…' : 'Send magic link'}
+              {sending ? 'Sending...' : 'Send magic link'}
             </button>
             {error && <div className="text-xs text-red-400 text-center">{error}</div>}
-            <div className="text-xs text-dim text-center pt-2">
+            <div className="text-xs text-dim text-center pt-1">
               First user becomes owner. Subsequent users must be invited by an owner.
             </div>
           </form>

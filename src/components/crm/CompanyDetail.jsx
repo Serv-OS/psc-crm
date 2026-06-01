@@ -223,7 +223,7 @@ export default function CompanyDetail({ companyId, profile, onClose, onNavigate 
 
 function Card({ title, count, action, children }) {
   return (
-    <div className="bg-card border border-bdr rounded-xl overflow-hidden">
+    <div className="glass-card rounded-2xl overflow-hidden">
       <div className="px-4 py-3 border-b border-bdr flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-paper">{title}</h3>

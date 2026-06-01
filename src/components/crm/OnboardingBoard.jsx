@@ -77,7 +77,7 @@ export default function OnboardingBoard({ profile, onSelectOnboarding, onNavigat
         <div className="h-full flex gap-2 px-4 py-3 min-w-max">
           {STAGES.map(stage => (
             <div key={stage.key}
-              className="w-52 shrink-0 flex flex-col bg-card/30 border border-bdr rounded-xl overflow-hidden"
+              className="w-52 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden"
               onDragOver={onDragOver} onDrop={e => onDrop(e, stage.key)}>
               <div className="px-3 py-2 border-b border-bdr" style={{ borderLeftColor: stage.color, borderLeftWidth: 3 }}>
                 <div className="text-[10px] font-bold uppercase tracking-wide text-paper">{stage.label}</div>

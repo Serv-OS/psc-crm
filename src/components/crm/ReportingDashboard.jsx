@@ -151,13 +151,13 @@ export default function ReportingDashboard({ profile }) {
                 <MetricCard label="Win Rate" value={`${salesMetrics.winRate}%`} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-card/50 border border-bdr rounded-xl p-4">
+                <div className="glass-card rounded-2xl p-4">
                   <div className={label + ' mb-3'}>By Stage</div>
                   {Object.entries(salesMetrics.byStage).map(([k, v]) => (
                     <div key={k} className="flex justify-between py-1 text-xs"><span className="text-paper">{k.replace(/_/g,' ')}</span><span className="text-ember font-mono">{v}</span></div>
                   ))}
                 </div>
-                <div className="bg-card/50 border border-bdr rounded-xl p-4">
+                <div className="glass-card rounded-2xl p-4">
                   <div className={label + ' mb-3'}>By Owner</div>
                   {Object.entries(salesMetrics.byOwner).map(([k, v]) => (
                     <div key={k} className="flex justify-between py-1 text-xs"><span className="text-paper">{k}</span><span className="text-ember font-mono">{v}</span></div>
@@ -179,7 +179,7 @@ export default function ReportingDashboard({ profile }) {
                 <MetricCard label="Live" value={obMetrics.live} color="text-green-400" />
                 <MetricCard label="In Progress" value={obMetrics.total - obMetrics.live} color="text-orange-400" />
               </div>
-              <div className="bg-card/50 border border-bdr rounded-xl p-4">
+              <div className="glass-card rounded-2xl p-4">
                 <div className={label + ' mb-3'}>By Stage</div>
                 {Object.entries(obMetrics.byStage).map(([k, v]) => (
                   <div key={k} className="flex justify-between py-1 text-xs"><span className="text-paper">{k.replace(/_/g,' ')}</span><span className="text-ember font-mono">{v}</span></div>
@@ -201,7 +201,7 @@ export default function ReportingDashboard({ profile }) {
                 <MetricCard label="Resolved" value={ticketMetrics.resolved} color="text-green-400" />
                 <MetricCard label="Total" value={ticketMetrics.total} />
               </div>
-              <div className="bg-card/50 border border-bdr rounded-xl p-4">
+              <div className="glass-card rounded-2xl p-4">
                 <div className={label + ' mb-3'}>By Type</div>
                 {Object.entries(ticketMetrics.byType).map(([k, v]) => (
                   <div key={k} className="flex justify-between py-1 text-xs"><span className="text-paper">{k}</span><span className="text-ember font-mono">{v}</span></div>
@@ -233,7 +233,7 @@ export default function ReportingDashboard({ profile }) {
 
           {tab === 'modules' && (
             <>
-              <div className="bg-card/50 border border-bdr rounded-xl p-4">
+              <div className="glass-card rounded-2xl p-4">
                 <div className={label + ' mb-3'}>Module Attach Rate</div>
                 {moduleMetrics.map(m => (
                   <div key={m.name} className="flex items-center gap-3 py-1.5">
@@ -262,7 +262,7 @@ export default function ReportingDashboard({ profile }) {
                 <MetricCard label="Contacts" value={contacts.length} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-card/50 border border-bdr rounded-xl p-4">
+                <div className="glass-card rounded-2xl p-4">
                   <div className={label + ' mb-3'}>Locations by Status</div>
                   {['prospect','onboarding','live','churned'].map(s => (
                     <div key={s} className="flex justify-between py-1 text-xs">
@@ -271,7 +271,7 @@ export default function ReportingDashboard({ profile }) {
                     </div>
                   ))}
                 </div>
-                <div className="bg-card/50 border border-bdr rounded-xl p-4">
+                <div className="glass-card rounded-2xl p-4">
                   <div className={label + ' mb-3'}>Feature Requests</div>
                   {['new','under_review','planned','in_progress','shipped','declined'].map(s => {
                     const count = featureRequests.filter(f => f.status === s).length;
@@ -306,10 +306,10 @@ export default function ReportingDashboard({ profile }) {
 
 function MetricCard({ label, value, sub, color = 'text-paper' }) {
   return (
-    <div className="bg-card/50 border border-bdr rounded-xl p-4 text-center">
-      <div className={`text-2xl font-bold font-mono ${color}`}>{value}</div>
-      <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-dim mt-1">{label}</div>
-      {sub && <div className="text-xs text-ember mt-0.5">{sub}</div>}
+    <div className="glass-card rounded-2xl p-5 text-center">
+      <div className={`text-3xl font-bold font-mono ${color}`}>{value}</div>
+      <div className="text-[9px] font-mono uppercase tracking-[0.18em] text-dim mt-1.5">{label}</div>
+      {sub && <div className="text-xs text-ember mt-1">{sub}</div>}
     </div>
   );
 }

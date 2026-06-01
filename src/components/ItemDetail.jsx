@@ -113,8 +113,8 @@ export default function ItemDetail({ itemId, profile, onClose }) {
   const feature = features.find(f => f.id === item.feature_id);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex justify-end" onClick={onClose}>
-      <div className="w-[640px] max-w-full h-full bg-ink-soft border-l border-bdr flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-end" onClick={onClose}>
+      <div className="w-[640px] max-w-full h-full glass border-l border-bdr flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-bdr flex items-center gap-3">
           <div className="text-xs text-dim font-mono">#{item.id.slice(0,8)}</div>
           <div className="flex-1"/>

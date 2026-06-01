@@ -285,7 +285,7 @@ function BucketColumn({ bucket, items, members, features, canWrite, onAddItem, o
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="w-72 shrink-0 flex flex-col bg-card/50 border border-bdr rounded-xl overflow-hidden"
+    <div className="w-72 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden"
       onDragOver={onDragOver} onDrop={e => onDrop(e, bucket.id)}
       onClick={() => setMenuOpen(false)}>
       <div className="px-3 py-2.5 border-b border-bdr flex items-center gap-2 relative" style={{ borderLeft: `3px solid ${bucket.color}` }}>
@@ -356,7 +356,7 @@ function BucketEditorModal({ mode, bucket, onSave, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()}
-        className="w-96 bg-ink-soft border border-bdr rounded-xl overflow-hidden shadow-2xl">
+        className="w-96 glass-raised rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-bdr">
           <div className="text-base font-bold text-paper">{mode === 'new' ? 'New bucket' : 'Edit bucket'}</div>
         </div>
@@ -433,7 +433,7 @@ function CreateItemModal({ draft: initial, buckets, members, features, project, 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
-      <div className="w-[640px] max-w-[90vw] max-h-[85vh] bg-ink-soft border border-bdr rounded-xl overflow-hidden shadow-2xl flex flex-col"
+      <div className="w-[640px] max-w-[90vw] max-h-[85vh] glass-raised rounded-2xl overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-bdr flex items-center justify-between">
           <div className="text-base font-bold text-paper">New item</div>

@@ -11,19 +11,113 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Subtle ambient mesh gradient behind everything */
+#root {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(232,116,60,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 80% 90%, rgba(99,102,241,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 70% at 50% 50%, rgba(30,28,22,0.5) 0%, transparent 70%);
+}
+
 ::selection { background: #E8743C; color: #0E0D0A; }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
+/* Glass scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(244,237,223,0.10); border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(244,237,223,0.18); }
+::-webkit-scrollbar-thumb {
+  background: rgba(244,237,223,0.08);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(244,237,223,0.14); background-clip: padding-box; }
 
+/* === Liquid Glass utility classes === */
+@layer components {
+
+  /* Primary glass panel (sidebar, modals) */
+  .glass {
+    background: rgba(30,28,22,0.55);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border: 1px solid rgba(244,237,223,0.08);
+    box-shadow: 0 0 0 1px rgba(244,237,223,0.04) inset, 0 8px 32px rgba(0,0,0,0.25);
+  }
+
+  /* Lighter glass for cards within glass panels */
+  .glass-card {
+    background: rgba(244,237,223,0.04);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid rgba(244,237,223,0.07);
+    box-shadow: 0 0 0 1px rgba(244,237,223,0.03) inset, 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  /* Raised glass for modals/overlays */
+  .glass-raised {
+    background: rgba(30,28,22,0.75);
+    backdrop-filter: blur(40px) saturate(1.6);
+    -webkit-backdrop-filter: blur(40px) saturate(1.6);
+    border: 1px solid rgba(244,237,223,0.10);
+    box-shadow:
+      0 0 0 1px rgba(244,237,223,0.05) inset,
+      0 0 1px 0 rgba(244,237,223,0.1),
+      0 16px 48px rgba(0,0,0,0.4);
+  }
+
+  /* Inner glass highlight (top edge shimmer) */
+  .glass-shimmer {
+    position: relative;
+  }
+  .glass-shimmer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(244,237,223,0.15), transparent);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+
+  /* Ember glow for primary buttons */
+  .btn-glass {
+    background: linear-gradient(135deg, #E8743C, #C75A29);
+    color: #0E0D0A;
+    font-weight: 600;
+    border: 1px solid rgba(232,116,60,0.3);
+    box-shadow: 0 0 20px rgba(232,116,60,0.2), 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+  }
+  .btn-glass:hover {
+    box-shadow: 0 0 30px rgba(232,116,60,0.3), 0 4px 16px rgba(0,0,0,0.3);
+    transform: translateY(-1px);
+  }
+
+  /* Ghost button (glass border) */
+  .btn-ghost {
+    background: rgba(244,237,223,0.04);
+    border: 1px solid rgba(244,237,223,0.10);
+    color: #948A7A;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+  }
+  .btn-ghost:hover {
+    background: rgba(244,237,223,0.08);
+    color: #F4EDDF;
+    border-color: rgba(244,237,223,0.15);
+  }
+}
+
+/* Prose styling */
 .prose-tight p { margin: 0.3em 0; }
 .prose-tight h1, .prose-tight h2, .prose-tight h3 { margin: 0.6em 0 0.3em; font-weight: 700; }
 .prose-tight h1 { font-size: 1.2em; }
 .prose-tight h2 { font-size: 1.1em; }
 .prose-tight h3 { font-size: 1.05em; }
-.prose-tight code { background: #17150F; padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
-.prose-tight pre { background: #17150F; padding: 10px; border-radius: 6px; overflow-x: auto; }
+.prose-tight code { background: rgba(23,21,15,0.7); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+.prose-tight pre { background: rgba(23,21,15,0.7); padding: 10px; border-radius: 6px; overflow-x: auto; }
 .prose-tight ul, .prose-tight ol { margin: 0.3em 0; padding-left: 1.5em; }
 .prose-tight a { color: #E8743C; text-decoration: underline; }
