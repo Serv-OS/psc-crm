@@ -223,7 +223,7 @@ export default function DealBoard({ profile, onSelectDeal, onNavigate }) {
           <div className="h-full flex gap-2 px-4 py-3 min-w-max">
             {STAGES.map(stage => (
               <div key={stage.key}
-                className="w-64 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden"
+                className="w-72 shrink-0 flex flex-col glass-card rounded-2xl overflow-hidden"
                 onDragOver={onDragOver} onDrop={e => onDrop(e, stage.key)}>
                 <div className="px-3 py-2 border-b border-bdr" style={{ borderLeftColor: stage.color, borderLeftWidth: 3 }}>
                   <div className="text-[10px] font-bold uppercase tracking-wide text-paper">{stage.label}</div>
@@ -234,46 +234,48 @@ export default function DealBoard({ profile, onSelectDeal, onNavigate }) {
                 <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
                   {(dealsByStage[stage.key] || []).map(d => {
                     const loc = dealLocation(d.id);
-                    const totalValue = (d.hardware_value || 0) + (d.services_value || 0) + (d.saas_arr || 0) + (d.payments_arr || 0);
-                    const displayValue = totalValue > 0 ? totalValue : d.value;
                     return (
                       <div key={d.id}
                         draggable={canWrite}
                         onDragStart={e => onDragStart(e, d)}
                         onClick={() => onSelectDeal(d.id)}
-                        className="glass-inner rounded-xl p-3 cursor-pointer">
-                        {/* Title + close date */}
-                        <div className="flex items-start justify-between gap-1 mb-1.5">
-                          <div className="text-xs text-paper font-semibold leading-snug">{d.name}</div>
+                        className="glass-inner rounded-2xl p-4 cursor-pointer">
+
+                        {/* Row 1: Name + Expected Close */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="text-base font-bold text-paper leading-tight">{d.name}</div>
                           {d.expected_close_date && (
                             <div className="text-right shrink-0">
-                              <div className="text-[8px] text-dim font-mono uppercase">Close</div>
-                              <div className="text-[10px] text-paper font-mono">{new Date(d.expected_close_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+                              <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-dim">Expected Close Date</div>
+                              <div className="text-sm text-paper font-mono">{new Date(d.expected_close_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
                             </div>
                           )}
                         </div>
-                        {/* Company + Location */}
-                        <div className="text-[10px] text-muted mb-1">{companyName(d.company_id)}</div>
-                        {loc && <div className="text-[10px] text-dim mb-1.5">{loc.name}</div>}
-                        {/* Revenue breakdown */}
-                        {(d.hardware_value || d.services_value || d.saas_arr || d.payments_arr) ? (
-                          <div className="space-y-0.5 mb-1.5">
-                            {d.hardware_value > 0 && <div className="flex justify-between text-[9px]"><span className="text-dim">Hardware</span><span className="text-paper font-mono">{fmt(d.hardware_value)}</span></div>}
-                            {d.services_value > 0 && <div className="flex justify-between text-[9px]"><span className="text-dim">Services</span><span className="text-paper font-mono">{fmt(d.services_value)}</span></div>}
-                            {d.saas_arr > 0 && <div className="flex justify-between text-[9px]"><span className="text-dim">SaaS ARR</span><span className="text-paper font-mono">{fmt(d.saas_arr)}</span></div>}
-                            {d.payments_arr > 0 && <div className="flex justify-between text-[9px]"><span className="text-dim">Payments ARR</span><span className="text-paper font-mono">{fmt(d.payments_arr)}</span></div>}
-                          </div>
-                        ) : null}
-                        {/* Total + owner */}
-                        <div className="flex items-center gap-1.5 pt-1 border-t border-bdr">
-                          {displayValue > 0 && <span className="text-[11px] text-ember font-mono font-bold">{fmt(displayValue)}</span>}
-                          {d.owner_id && (
-                            <span className="ml-auto w-5 h-5 rounded-full bg-ember text-white text-[9px] font-bold flex items-center justify-center"
+
+                        {/* Label/value rows */}
+                        <table className="w-full">
+                          <tbody className="text-sm">
+                            <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">Company</td><td className="py-0.5 text-paper">{companyName(d.company_id) || '--'}</td></tr>
+                            {loc && <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">Location</td><td className="py-0.5 text-paper">{loc.name}</td></tr>}
+                            {d.hardware_value > 0 && <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">Hardware</td><td className="py-0.5 text-paper font-mono">{fmt(d.hardware_value)}</td></tr>}
+                            {d.services_value > 0 && <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">Services</td><td className="py-0.5 text-paper font-mono">{fmt(d.services_value)}</td></tr>}
+                            {d.saas_arr > 0 && <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">SAAS ARR</td><td className="py-0.5 text-paper font-mono">{fmt(d.saas_arr)}</td></tr>}
+                            {d.payments_arr > 0 && <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">Payments ARR</td><td className="py-0.5 text-paper font-mono">{fmt(d.payments_arr)}</td></tr>}
+                            {!d.hardware_value && !d.services_value && !d.saas_arr && !d.payments_arr && d.value > 0 && (
+                              <tr><td className="py-0.5 text-muted font-medium pr-4 whitespace-nowrap">Value</td><td className="py-0.5 text-paper font-mono">{fmt(d.value)}</td></tr>
+                            )}
+                          </tbody>
+                        </table>
+
+                        {/* Owner avatar bottom right */}
+                        {d.owner_id && (
+                          <div className="flex justify-end mt-2">
+                            <span className="w-7 h-7 rounded-full bg-ember text-white text-xs font-bold flex items-center justify-center shadow-sm"
                               title={ownerName(d.owner_id)}>
                               {ownerName(d.owner_id)[0]?.toUpperCase() || '?'}
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
