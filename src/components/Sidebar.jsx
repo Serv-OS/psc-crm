@@ -198,6 +198,7 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
           { key: 'projects',         icon: '\u{1F4C1}', label: 'Projects' },
           { key: 'feature_requests', icon: '\u{1F4A1}', label: 'Feature Requests' },
           { key: 'releases',         icon: '\u{1F4E6}', label: 'Releases' },
+          { key: 'reporting',        icon: '\u{1F4CA}', label: 'Reporting' },
         ].map(item => (
           <button key={item.key} onClick={() => setView(item.key)}
             className={`w-full px-3 py-2 text-left rounded-lg text-sm flex items-center gap-2 ${
