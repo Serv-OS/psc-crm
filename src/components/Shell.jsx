@@ -17,6 +17,10 @@ import ProjectList from './crm/ProjectList.jsx';
 import ProjectDetail from './crm/ProjectDetail.jsx';
 import DealBoard from './crm/DealBoard.jsx';
 import DealDetail from './crm/DealDetail.jsx';
+import OnboardingBoard from './crm/OnboardingBoard.jsx';
+import OnboardingDetail from './crm/OnboardingDetail.jsx';
+import TicketList from './crm/TicketList.jsx';
+import TicketDetail from './crm/TicketDetail.jsx';
 
 export default function Shell({ session }) {
   const [profile, setProfile]   = useState(null);
@@ -89,6 +93,14 @@ export default function Shell({ session }) {
         return <DealBoard profile={profile} onSelectDeal={(id) => { setView('deal_detail'); setDetailId(id); }} onNavigate={navigateTo} />;
       case 'deal_detail':
         return <DealDetail dealId={detailId} profile={profile} onClose={() => setView('deals')} onNavigate={navigateTo} />;
+      case 'onboarding':
+        return <OnboardingBoard profile={profile} onSelectOnboarding={(id) => { setView('onboarding_detail'); setDetailId(id); }} onNavigate={navigateTo} />;
+      case 'onboarding_detail':
+        return <OnboardingDetail onboardingId={detailId} profile={profile} onClose={() => setView('onboarding')} onNavigate={navigateTo} />;
+      case 'tickets':
+        return <TicketList profile={profile} onSelect={(id) => { setView('ticket_detail'); setDetailId(id); }} onNavigate={navigateTo} />;
+      case 'ticket_detail':
+        return <TicketDetail ticketId={detailId} profile={profile} onClose={() => setView('tickets')} onNavigate={navigateTo} />;
       case 'tasks':
         return <TaskList profile={profile} onSelect={(id) => { setView('task_detail'); setDetailId(id); }} />;
       case 'task_detail':
