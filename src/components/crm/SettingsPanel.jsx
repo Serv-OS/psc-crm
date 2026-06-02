@@ -162,6 +162,48 @@ export default function SettingsPanel({ profile }) {
             </div>
           </div>
 
+          {/* Twilio SMS Integration */}
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-lg">
+                {'\u{1F4AC}'}
+              </div>
+              <div className="flex-1">
+                <div className="text-base font-bold text-paper">Twilio SMS / Phone</div>
+                <div className="text-xs text-muted">SMS support and phone calls via Twilio</div>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="p-3 glass-inner rounded-xl flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-bold">
+                  {'\u{1F4F1}'}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-paper">+44 7576 562085</div>
+                  <div className="text-xs text-muted">Support SMS number</div>
+                </div>
+                <span className="px-2 py-0.5 text-[9px] font-bold uppercase rounded bg-blue-100 text-blue-700 border border-blue-200">Configured</span>
+              </div>
+
+              <div className="text-xs text-muted leading-relaxed">
+                <strong>How it works:</strong> When a customer texts +44 7576 562085, a support ticket is automatically created in the CRM.
+                Agents reply from the SMS tab in the ticket, and the reply is sent from the same number.
+                The customer sees a normal text conversation.
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-bdr">
+                <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-2">Setup</div>
+                <div className="text-xs text-muted space-y-1">
+                  <div>1. Add Twilio secrets in Supabase: <code className="bg-slate-100 px-1 rounded">TWILIO_ACCOUNT_SID</code>, <code className="bg-slate-100 px-1 rounded">TWILIO_AUTH_TOKEN</code>, <code className="bg-slate-100 px-1 rounded">TWILIO_FROM_NUMBER</code></div>
+                  <div>2. In Twilio console, set the SMS webhook URL for +447576562085 to:</div>
+                  <div className="bg-slate-50 border border-slate-200 rounded p-2 font-mono text-[10px] break-all mt-1">
+                    {import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-inbound-sms
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

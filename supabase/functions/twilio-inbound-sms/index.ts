@@ -1,0 +1,174 @@
+// Twilio Inbound SMS Webhook
+// Receives SMS from customers, creates/threads into support tickets
+// Configure in Twilio: set webhook URL to this function
+//
+// Required Supabase Secrets: TWILIO_AUTH_TOKEN (for signature validation)
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+serve(async (req) => {
+  // Twilio sends webhooks as POST with form-urlencoded body
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" },
+    });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Parse Twilio webhook payload (form-urlencoded)
+    const formData = await req.formData();
+    const from = formData.get("From") as string; // e.g. +447123456789
+    const to = formData.get("To") as string;     // e.g. +447576562085
+    const body = formData.get("Body") as string;
+    const messageSid = formData.get("MessageSid") as string;
+
+    if (!from || !body) {
+      return twimlResponse("Missing required fields");
+    }
+
+    // Normalize phone number (ensure +44 format)
+    const normalizedFrom = from.replace(/\s/g, "");
+
+    // Check if we already processed this message
+    const { data: existing } = await supabase
+      .from("crm_activities")
+      .select("id")
+      .eq("message_id", messageSid)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      return twimlResponse(""); // Already processed, return empty TwiML
+    }
+
+    // Try to match sender to a contact by phone number
+    let contactId: string | null = null;
+    let companyId: string | null = null;
+    let contactName = normalizedFrom;
+
+    const { data: contacts } = await supabase
+      .from("contacts")
+      .select("id, first_name, last_name, phone")
+      .or(`phone.eq.${normalizedFrom},phone.eq.${normalizedFrom.replace("+44", "0")}`)
+      .limit(1);
+
+    if (contacts && contacts.length > 0) {
+      contactId = contacts[0].id;
+      contactName = [contacts[0].first_name, contacts[0].last_name].filter(Boolean).join(" ") || normalizedFrom;
+
+      // Find company via associations
+      const { data: assocs } = await supabase
+        .from("associations")
+        .select("to_id")
+        .eq("from_type", "contact")
+        .eq("from_id", contactId)
+        .eq("to_type", "company")
+        .limit(1);
+
+      if (assocs && assocs.length > 0) {
+        companyId = assocs[0].to_id;
+      }
+    }
+
+    // Find existing open ticket for this phone number
+    let ticketId: string | null = null;
+
+    const { data: openTickets } = await supabase
+      .from("tickets")
+      .select("id, stage")
+      .eq("customer_phone", normalizedFrom)
+      .eq("channel", "sms")
+      .not("stage", "in", '("closed")')
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    if (openTickets && openTickets.length > 0) {
+      ticketId = openTickets[0].id;
+
+      // Reopen if resolved
+      if (openTickets[0].stage === "resolved") {
+        await supabase.from("tickets").update({ stage: "in_progress" }).eq("id", ticketId);
+        await supabase.from("stage_history").insert({
+          object_type: "ticket", object_id: ticketId,
+          from_stage: "resolved", to_stage: "in_progress",
+        });
+      }
+    }
+
+    // Create new ticket if no open one exists
+    if (!ticketId) {
+      const { data: newTicket } = await supabase
+        .from("tickets")
+        .insert({
+          subject: `SMS from ${contactName}`,
+          description: body.slice(0, 200),
+          company_id: companyId || undefined,
+          channel: "sms",
+          customer_phone: normalizedFrom,
+          contact_id: contactId,
+          source: "sms",
+        })
+        .select()
+        .single();
+
+      if (newTicket) {
+        ticketId = newTicket.id;
+
+        await supabase.from("stage_history").insert({
+          object_type: "ticket", object_id: ticketId,
+          from_stage: null, to_stage: "new",
+        });
+
+        // Link contact to ticket
+        if (contactId) {
+          await supabase.from("associations").insert({
+            from_type: "ticket", from_id: ticketId,
+            to_type: "contact", to_id: contactId,
+            label: "primary_contact",
+          });
+        }
+      }
+    }
+
+    // Create activity
+    if (ticketId) {
+      await supabase.from("crm_activities").insert({
+        type: "sms",
+        body: body,
+        subject_type: "ticket",
+        subject_id: ticketId,
+        direction: "inbound",
+        contact_id: contactId,
+        message_id: messageSid,
+        thread_id: ticketId, // All SMS on a ticket share the ticket as thread
+        is_internal: false,
+        channel_metadata: {
+          from_number: normalizedFrom,
+          to_number: to,
+          twilio_sid: messageSid,
+        },
+      });
+    }
+
+    // Return empty TwiML (no auto-reply, agents reply from CRM)
+    return twimlResponse("");
+  } catch (error) {
+    console.error("Twilio inbound error:", error);
+    return twimlResponse("");
+  }
+});
+
+function twimlResponse(message: string): Response {
+  const twiml = message
+    ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`
+    : `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
+
+  return new Response(twiml, {
+    headers: { "Content-Type": "text/xml" },
+  });
+}

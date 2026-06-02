@@ -162,7 +162,43 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
       }
     }
 
-    // For notes, SMS, calls: create activity directly
+    // SMS: send via Twilio edge function
+    if (channel === 'sms' && subjectType === 'ticket') {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-send-sms`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({
+              ticket_id: subjectId,
+              to: (toPhone || ticket?.customer_phone || '').trim(),
+              body: body.trim(),
+            }),
+          }
+        );
+        const result = await res.json();
+        if (!res.ok) {
+          alert('SMS send failed: ' + (result.error || 'Unknown error'));
+          setSending(false);
+          return;
+        }
+        setBody(''); setToPhone('');
+        setSending(false);
+        load();
+        return;
+      } catch (err) {
+        alert('SMS send failed: ' + err.message);
+        setSending(false);
+        return;
+      }
+    }
+
+    // For notes, calls: create activity directly
     const record = {
       type: channel,
       subject: null,
