@@ -50,6 +50,15 @@ serve(async (req) => {
 
     // INBOUND CALL: customer calling the support number
 
+    // Skip if this is a client-originated call that already went through outbound
+    if (from?.startsWith("client:")) {
+      console.log("Skipping client-originated inbound leg");
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { headers: { "Content-Type": "text/xml" } }
+      );
+    }
+
     // Normalize phone number and generate all possible formats for matching
     const rawFrom = from?.replace(/\s/g, "") || "";
     const phoneVariants: string[] = [];

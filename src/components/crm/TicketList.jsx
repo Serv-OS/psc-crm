@@ -34,7 +34,14 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Realtime: auto-refresh when tickets change
+    const ch = supabase.channel('tickets-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const load = async () => {
     setLoading(true);
