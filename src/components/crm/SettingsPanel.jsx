@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { TEAM_OPTIONS, TEAM_LABELS } from '../UsersPanel.jsx';
 
 const GMAIL_CLIENT_ID = '836252293153-ekl6o41r2kra549aqnjr9bvpiq2t4nfg.apps.googleusercontent.com';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -9,6 +10,8 @@ const SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googlea
 export default function SettingsPanel({ profile }) {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState(null);
+  const [agentCounts, setAgentCounts] = useState({});
 
   const isOwner = profile.role === 'owner';
 
@@ -30,9 +33,30 @@ export default function SettingsPanel({ profile }) {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('gmail_connections').select('*').order('created_at', { ascending: false });
-    setConnections(data || []);
+    const [gc, ss, profs] = await Promise.all([
+      supabase.from('gmail_connections').select('*').order('created_at', { ascending: false }),
+      supabase.from('support_settings').select('*').eq('id', 1).maybeSingle(),
+      supabase.from('profiles').select('teams'),
+    ]);
+    setConnections(gc.data || []);
+    setSettings(ss.data || { auto_assign_enabled: true, assign_team: 'support', prefer_online: true });
+    // Count members per team for the helper text
+    const counts = {};
+    (profs.data || []).forEach(p => (p.teams || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+    setAgentCounts(counts);
     setLoading(false);
+  };
+
+  const saveSettings = async (patch) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    await supabase.from('support_settings').upsert({
+      id: 1,
+      auto_assign_enabled: next.auto_assign_enabled,
+      assign_team: next.assign_team,
+      prefer_online: next.prefer_online,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
   };
 
   const connectGmail = async () => {
@@ -79,6 +103,64 @@ export default function SettingsPanel({ profile }) {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl space-y-6">
+
+          {/* Ticket auto-assignment */}
+          {settings && (
+            <div className="glass-card rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-ember/15 border border-ember/25 flex items-center justify-center text-lg">{'\u{1F39F}'}</div>
+                <div className="flex-1">
+                  <div className="text-base font-bold text-paper">Ticket auto-assignment</div>
+                  <div className="text-xs text-muted">Route new tickets to a team automatically</div>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <button type="button" disabled={!isOwner}
+                  onClick={() => saveSettings({ auto_assign_enabled: !settings.auto_assign_enabled })}
+                  className="w-full flex items-center gap-3 p-3 glass-inner rounded-xl text-left disabled:opacity-60">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-paper">Enable auto-assignment</div>
+                    <div className="text-xs text-muted">New tickets get an owner the moment they arrive</div>
+                  </div>
+                  <div className={`relative w-10 h-6 rounded-full transition shrink-0 ${settings.auto_assign_enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${settings.auto_assign_enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                  </div>
+                </button>
+
+                <div className={settings.auto_assign_enabled ? '' : 'opacity-50 pointer-events-none'}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block">Assign to team</label>
+                      <select disabled={!isOwner} value={settings.assign_team}
+                        onChange={e => saveSettings({ assign_team: e.target.value })}
+                        className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper focus:outline-none focus:border-ember">
+                        {TEAM_OPTIONS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                      </select>
+                      <div className="text-[11px] text-dim mt-1">
+                        {agentCounts[settings.assign_team] || 0} {TEAM_LABELS[settings.assign_team] || settings.assign_team} member{(agentCounts[settings.assign_team] || 0) !== 1 ? 's' : ''}
+                        {(agentCounts[settings.assign_team] || 0) === 0 && ' — add some in Users'}
+                      </div>
+                    </div>
+                    <button type="button" disabled={!isOwner}
+                      onClick={() => saveSettings({ prefer_online: !settings.prefer_online })}
+                      className="flex items-center gap-3 p-3 glass-inner rounded-xl text-left h-fit self-end disabled:opacity-60">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-paper">Prefer online agents</div>
+                        <div className="text-xs text-muted">Route to whoever's available first</div>
+                      </div>
+                      <div className={`relative w-10 h-6 rounded-full transition shrink-0 ${settings.prefer_online ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${settings.prefer_online ? 'left-[18px]' : 'left-0.5'}`} />
+                      </div>
+                    </button>
+                  </div>
+                  <div className="text-xs text-muted mt-3 pt-3 border-t border-bdr leading-relaxed">
+                    Tickets are given to the {TEAM_LABELS[settings.assign_team] || settings.assign_team} agent with the fewest open tickets{settings.prefer_online ? ', preferring those currently online' : ''}. Works for tickets from SMS, email, calls and the New ticket form. The assigned agent gets a notification.
+                  </div>
+                </div>
+                {!isOwner && <div className="text-[11px] text-dim">Only owners can change these settings.</div>}
+              </div>
+            </div>
+          )}
 
           {/* Gmail Integration */}
           <div className="glass-card rounded-2xl overflow-hidden">
