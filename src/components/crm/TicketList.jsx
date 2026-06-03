@@ -181,7 +181,8 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
-              <th className="px-6 py-2.5 text-left">Subject</th>
+              <th className="px-6 py-2.5 text-left">Ticket</th>
+              <th className="px-3 py-2.5 text-left">Subject</th>
               <th className="px-3 py-2.5 text-left">Company</th>
               <th className="px-3 py-2.5 text-center">Priority</th>
               <th className="px-3 py-2.5 text-left">Type</th>
@@ -191,10 +192,11 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>}
+            {loading && <tr><td colSpan={8} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>}
             {!loading && filtered.map(t => (
               <tr key={t.id} onClick={() => onSelect(t.id)} className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                <td className="px-6 py-3 text-sm text-paper">{t.subject}</td>
+                <td className="px-6 py-3 text-xs font-mono font-bold text-ember">{t.ticket_number ? `#${t.ticket_number}` : '--'}</td>
+                <td className="px-3 py-3 text-sm text-paper">{t.subject}</td>
                 <td className="px-3 py-3 text-xs text-muted">{companyName(t.company_id)}</td>
                 <td className={`px-3 py-3 text-xs font-bold text-center ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</td>
                 <td className="px-3 py-3 text-xs text-muted">{t.ticket_type}</td>
@@ -208,7 +210,7 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
               </tr>
             ))}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">No tickets.</td></tr>
+              <tr><td colSpan={8} className="px-6 py-8 text-center text-dim text-sm">No tickets.</td></tr>
             )}
           </tbody>
         </table>

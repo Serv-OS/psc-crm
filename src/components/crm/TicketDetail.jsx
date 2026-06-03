@@ -11,30 +11,46 @@ const STAGE_STYLES = {
   resolved:'bg-emerald-100 text-emerald-700 border border-emerald-200', closed:'bg-slate-100 text-slate-600 border border-slate-200',
 };
 
+// Generate UK/intl phone format variants so we can match a contact regardless of how the number is stored
+function phoneVariants(phone) {
+  if (!phone) return [];
+  const p = phone.replace(/\s/g, '');
+  const out = [p];
+  if (p.startsWith('+44')) { out.push('0' + p.slice(3)); out.push(p.slice(1)); }
+  if (p.startsWith('0')) { out.push('+44' + p.slice(1)); out.push('44' + p.slice(1)); }
+  if (p.startsWith('44')) { out.push('+' + p); out.push('0' + p.slice(2)); }
+  return out;
+}
+
 export default function TicketDetail({ ticketId, profile, onClose, onNavigate }) {
   const [ticket, setTicket] = useState(null);
   const [company, setCompany] = useState(null);
   const [locations, setLocations] = useState([]);
   const [members, setMembers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [history, setHistory] = useState([]);
   const [projects, setProjects] = useState([]);
   const [contactContext, setContactContext] = useState({ companies: [], locations: [] });
+  const [matchedContact, setMatchedContact] = useState(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
+  const [creatingContact, setCreatingContact] = useState(false);
+  const [newContact, setNewContact] = useState({ first_name: '', last_name: '', email: '', phone: '' });
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
   useEffect(() => { load(); }, [ticketId]);
 
   const load = async () => {
-    const [t, m, c, h, prj, allLoc] = await Promise.all([
+    const [t, m, c, h, prj, allLoc, ct] = await Promise.all([
       supabase.from('tickets').select('*').eq('id', ticketId).single(),
       supabase.from('profiles').select('id, email, display_name'),
       supabase.from('companies').select('id, name').order('name'),
       supabase.from('stage_history').select('*').eq('object_type', 'ticket').eq('object_id', ticketId).order('changed_at', { ascending: false }),
       supabase.from('crm_projects').select('*').eq('subject_type', 'ticket').eq('subject_id', ticketId).order('created_at', { ascending: false }),
       supabase.from('locations').select('id, name, company_id, venue_type, city').order('name'),
+      supabase.from('contacts').select('id, first_name, last_name, email, phone').order('last_name'),
     ]);
     setTicket(t.data);
     setMembers(m.data || []);
@@ -42,9 +58,24 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
     setHistory(h.data || []);
     setProjects(prj.data || []);
     setLocations(allLoc.data || []);
+    setContacts(ct.data || []);
     if (t.data?.company_id) {
       setCompany(c.data?.find(co => co.id === t.data.company_id) || null);
     }
+
+    // Detect whether the ticket's customer matches an existing contact (by contact_id, phone, or email)
+    let matched = null;
+    if (t.data?.contact_id) {
+      matched = (ct.data || []).find(x => x.id === t.data.contact_id) || null;
+    }
+    if (!matched && (t.data?.customer_phone || t.data?.customer_email)) {
+      const variants = phoneVariants(t.data?.customer_phone);
+      matched = (ct.data || []).find(x =>
+        (t.data.customer_email && x.email && x.email.toLowerCase() === t.data.customer_email.toLowerCase()) ||
+        (x.phone && variants.includes(x.phone.replace(/\s/g, '')))
+      ) || null;
+    }
+    setMatchedContact(matched);
 
     // Auto-pull company/location from linked contacts
     const [contactAssocs] = await Promise.all([
@@ -65,6 +96,40 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
         locations: (allLoc.data || []).filter(l => linkedLocationIds.includes(l.id)),
       });
     }
+  };
+
+  // Create a brand-new contact from the ticket's customer details, link it, and set as primary
+  const createContactFromTicket = async () => {
+    const payload = {
+      first_name: newContact.first_name.trim() || null,
+      last_name: newContact.last_name.trim() || null,
+      email: (newContact.email.trim() || ticket.customer_email || '') || null,
+      phone: (newContact.phone.trim() || ticket.customer_phone || '') || null,
+      owner_id: profile.id,
+    };
+    if (!payload.first_name && !payload.last_name && !payload.email && !payload.phone) {
+      alert('Enter at least a name, email, or phone for the new contact.');
+      return;
+    }
+    const { data: contact, error } = await supabase.from('contacts').insert(payload).select().single();
+    if (error) { alert('Could not create contact: ' + error.message); return; }
+
+    // Link contact to the ticket (association + ticket.contact_id)
+    await supabase.from('associations').insert({
+      from_type: 'ticket', from_id: ticketId, to_type: 'contact', to_id: contact.id, label: 'primary_contact',
+    });
+    await supabase.from('tickets').update({ contact_id: contact.id }).eq('id', ticketId);
+
+    // Link contact to the ticket's company if there is one
+    if (ticket.company_id) {
+      await supabase.from('associations').insert({
+        from_type: 'contact', from_id: contact.id, to_type: 'company', to_id: ticket.company_id, label: 'primary_contact',
+      });
+    }
+
+    setCreatingContact(false);
+    setNewContact({ first_name: '', last_name: '', email: '', phone: '' });
+    load();
   };
 
   const startEdit = () => { setDraft({ ...ticket }); setEditing(true); };
@@ -125,7 +190,14 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
       <div className="px-6 py-5 border-b border-bdr flex items-center gap-4">
         <button onClick={onClose} className="text-muted hover:text-paper text-lg">&larr;</button>
         <div className="flex-1 min-w-0">
-          <div className="text-xl font-bold text-paper truncate">{ticket.subject}</div>
+          <div className="flex items-center gap-2">
+            {ticket.ticket_number && (
+              <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-ink-soft text-ember border border-bdr shrink-0">
+                #{ticket.ticket_number}
+              </span>
+            )}
+            <div className="text-xl font-bold text-paper truncate">{ticket.subject}</div>
+          </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className={`badge-status ${STAGE_STYLES[ticket.stage]}`}>{STAGE_LABELS[ticket.stage]}</span>
             <span className="text-xs text-dim font-mono">{ticket.priority}</span>
@@ -208,6 +280,61 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
 
             {/* LEFT: Key Info + Company + Locations */}
             <div className="col-span-4 space-y-4">
+              {/* Customer card: show who contacted us, match or create a contact */}
+              {(ticket.customer_phone || ticket.customer_email || matchedContact) && (
+                <Card title="Customer">
+                  <div className="space-y-2">
+                    {ticket.customer_phone && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-base">{'\u{1F4F1}'}</span>
+                        <span className="text-paper font-mono">{ticket.customer_phone}</span>
+                      </div>
+                    )}
+                    {ticket.customer_email && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-base">{'\u{1F4E7}'}</span>
+                        <span className="text-paper break-all">{ticket.customer_email}</span>
+                      </div>
+                    )}
+
+                    {matchedContact ? (
+                      <div onClick={() => onNavigate?.('contact', matchedContact.id)}
+                        className="mt-2 p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold shrink-0">
+                          {([matchedContact.first_name, matchedContact.last_name].filter(Boolean).join(' ')[0] || '?').toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-paper">{[matchedContact.first_name, matchedContact.last_name].filter(Boolean).join(' ') || matchedContact.email || matchedContact.phone}</div>
+                          <div className="text-xs text-muted">Known contact</div>
+                        </div>
+                      </div>
+                    ) : canWrite ? (
+                      creatingContact ? (
+                        <div className="mt-2 p-3 glass-inner rounded-xl space-y-2">
+                          <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">New contact</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input className={input} placeholder="First name" value={newContact.first_name} onChange={e => setNewContact({ ...newContact, first_name: e.target.value })} autoFocus />
+                            <input className={input} placeholder="Last name" value={newContact.last_name} onChange={e => setNewContact({ ...newContact, last_name: e.target.value })} />
+                          </div>
+                          <input className={input} placeholder="Email" value={newContact.email || ticket.customer_email || ''} onChange={e => setNewContact({ ...newContact, email: e.target.value })} />
+                          <input className={input} placeholder="Phone" value={newContact.phone || ticket.customer_phone || ''} onChange={e => setNewContact({ ...newContact, phone: e.target.value })} />
+                          <div className="flex gap-2">
+                            <button onClick={createContactFromTicket} className="btn-glass px-3 py-1.5 rounded-xl text-xs">Create &amp; link</button>
+                            <button onClick={() => setCreatingContact(false)} className="btn-ghost px-3 py-1.5 rounded-xl text-xs">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 p-3 glass-inner rounded-xl">
+                          <div className="text-xs text-muted mb-2">This customer isn't in your contacts yet.</div>
+                          <button onClick={() => { setCreatingContact(true); setNewContact({ first_name: '', last_name: '', email: ticket.customer_email || '', phone: ticket.customer_phone || '' }); }}
+                            className="btn-glass px-3 py-1.5 rounded-xl text-xs w-full">+ Create new contact</button>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                </Card>
+              )}
+
               <Card title="Key Info">
                 <div className="space-y-3">
                   <Field label="Priority" value={ticket.priority} />
