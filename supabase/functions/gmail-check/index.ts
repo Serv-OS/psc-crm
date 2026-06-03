@@ -237,19 +237,23 @@ serve(async (req) => {
 
       // Create ticket if no thread match
       if (!ticketId) {
-        const { data: newTicket } = await supabase
+        const ticketData: any = {
+          subject: subject || "Email from " + senderEmail,
+          description: null,
+          channel: "email",
+          customer_email: senderEmail,
+          contact_id: contactId,
+          source: "email",
+        };
+        if (companyId) ticketData.company_id = companyId;
+
+        const { data: newTicket, error: ticketErr } = await supabase
           .from("tickets")
-          .insert({
-            subject: subject || "Email from " + senderEmail,
-            description: null,
-            company_id: companyId || undefined,
-            channel: "email",
-            customer_email: senderEmail,
-            contact_id: contactId,
-            source: "email",
-          })
+          .insert(ticketData)
           .select()
           .single();
+
+        if (ticketErr) console.error("Ticket create error:", ticketErr);
 
         if (newTicket) {
           ticketId = newTicket.id;
