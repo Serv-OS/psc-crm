@@ -49,19 +49,56 @@ serve(async (req) => {
     }
 
     // INBOUND CALL: customer calling the support number
-    // Try to match caller to a contact
-    let callerName = from;
-    const normalizedFrom = from?.replace(/\s/g, "") || "";
 
-    if (normalizedFrom) {
+    // Normalize phone number and generate all possible formats for matching
+    const rawFrom = from?.replace(/\s/g, "") || "";
+    const phoneVariants: string[] = [];
+    if (rawFrom) {
+      phoneVariants.push(rawFrom);
+      // +447xxx -> 07xxx and 447xxx
+      if (rawFrom.startsWith("+44")) {
+        phoneVariants.push("0" + rawFrom.slice(3));
+        phoneVariants.push(rawFrom.slice(1)); // 447xxx
+      }
+      // 07xxx -> +447xxx and 447xxx
+      if (rawFrom.startsWith("0")) {
+        phoneVariants.push("+44" + rawFrom.slice(1));
+        phoneVariants.push("44" + rawFrom.slice(1));
+      }
+      // +1xxx (US) -> just keep as is
+    }
+
+    // Match caller to a contact using all phone variants
+    let contactId: string | null = null;
+    let companyId: string | null = null;
+    let callerName = from;
+
+    if (phoneVariants.length > 0) {
+      const phoneFilter = phoneVariants.map(p => `phone.eq.${p}`).join(",");
       const { data: contacts } = await supabase
         .from("contacts")
-        .select("first_name, last_name, phone")
-        .or(`phone.eq.${normalizedFrom},phone.eq.${normalizedFrom.replace("+44", "0")}`)
+        .select("id, first_name, last_name, phone")
+        .or(phoneFilter)
         .limit(1);
 
       if (contacts && contacts.length > 0) {
+        contactId = contacts[0].id;
         callerName = [contacts[0].first_name, contacts[0].last_name].filter(Boolean).join(" ") || from;
+
+        // Get company from contact's associations
+        const { data: companyAssocs } = await supabase
+          .from("associations")
+          .select("to_id")
+          .eq("from_type", "contact")
+          .eq("from_id", contactId)
+          .eq("to_type", "company")
+          .limit(1);
+
+        if (companyAssocs && companyAssocs.length > 0) {
+          companyId = companyAssocs[0].to_id;
+        }
+
+        console.log(`Matched contact: ${callerName} (${contactId}), company: ${companyId}`);
       }
     }
 
@@ -72,16 +109,19 @@ serve(async (req) => {
       .select("profile_id, twilio_identity, status")
       .eq("status", "online")
       .gte("last_seen_at", fiveMinAgo)
-      .order("last_seen_at", { ascending: true }); // Least recently used first
+      .order("last_seen_at", { ascending: true });
 
-    // Log the incoming call
     // Find or create a ticket for this caller
     let ticketId: string | null = null;
+    const normalizedFrom = rawFrom;
+
     if (normalizedFrom) {
+      // Search for open tickets matching any phone variant
+      const ticketPhoneFilter = phoneVariants.map(p => `customer_phone.eq.${p}`).join(",");
       const { data: openTickets } = await supabase
         .from("tickets")
         .select("id")
-        .eq("customer_phone", normalizedFrom)
+        .or(ticketPhoneFilter)
         .not("stage", "in", '("closed")')
         .order("updated_at", { ascending: false })
         .limit(1);
@@ -89,17 +129,25 @@ serve(async (req) => {
       if (openTickets && openTickets.length > 0) {
         ticketId = openTickets[0].id;
       } else {
-        // Create a new ticket for this call
-        const { data: newTicket } = await supabase
+        // Create a new ticket
+        const ticketData: any = {
+          subject: `Call from ${callerName}`,
+          channel: "phone",
+          customer_phone: normalizedFrom,
+          contact_id: contactId,
+          source: "phone",
+        };
+        if (companyId) ticketData.company_id = companyId;
+
+        const { data: newTicket, error: ticketErr } = await supabase
           .from("tickets")
-          .insert({
-            subject: `Call from ${callerName}`,
-            channel: "phone",
-            customer_phone: normalizedFrom,
-            source: "phone",
-          })
+          .insert(ticketData)
           .select()
           .single();
+
+        if (ticketErr) {
+          console.error("Ticket create error:", ticketErr);
+        }
 
         if (newTicket) {
           ticketId = newTicket.id;
@@ -107,6 +155,17 @@ serve(async (req) => {
             object_type: "ticket", object_id: ticketId,
             from_stage: null, to_stage: "new",
           });
+
+          // Link contact to ticket via association
+          if (contactId) {
+            await supabase.from("associations").insert({
+              from_type: "ticket",
+              from_id: ticketId,
+              to_type: "contact",
+              to_id: contactId,
+              label: "primary_contact",
+            });
+          }
         }
       }
     }

@@ -46,15 +46,27 @@ serve(async (req) => {
       return twimlResponse(""); // Already processed, return empty TwiML
     }
 
+    // Generate all phone variants for matching
+    const phoneVariants: string[] = [normalizedFrom];
+    if (normalizedFrom.startsWith("+44")) {
+      phoneVariants.push("0" + normalizedFrom.slice(3));
+      phoneVariants.push(normalizedFrom.slice(1));
+    }
+    if (normalizedFrom.startsWith("0")) {
+      phoneVariants.push("+44" + normalizedFrom.slice(1));
+      phoneVariants.push("44" + normalizedFrom.slice(1));
+    }
+
     // Try to match sender to a contact by phone number
     let contactId: string | null = null;
     let companyId: string | null = null;
     let contactName = normalizedFrom;
 
+    const phoneFilter = phoneVariants.map(p => `phone.eq.${p}`).join(",");
     const { data: contacts } = await supabase
       .from("contacts")
       .select("id, first_name, last_name, phone")
-      .or(`phone.eq.${normalizedFrom},phone.eq.${normalizedFrom.replace("+44", "0")}`)
+      .or(phoneFilter)
       .limit(1);
 
     if (contacts && contacts.length > 0) {
