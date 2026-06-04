@@ -216,19 +216,21 @@ body {
   .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
-/* Wide data tables scroll horizontally instead of overflowing the viewport */
+/* Any remaining wide tables get clean horizontal scroll (the main entity
+   lists render as cards on mobile instead — see the *List components). */
 @media (max-width: 1023px) {
-  main table { display: block; width: max-content; min-width: 100%; overflow-x: auto; }
-  main thead, main tbody { display: table; width: 100%; table-layout: fixed; }
+  main .overflow-y-auto { overflow-x: auto; }
 }
 
-/* Comfortable tap targets + avoid accidental horizontal scroll on the page */
+/* Comfortable widths on small screens */
 @media (max-width: 640px) {
   .max-w-\[1400px\], .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl { max-width: 100% !important; }
 }
 
-/* Toolbars / page headers wrap instead of overflowing on phones */
+/* Page headers / toolbars wrap; detail-page titles take a full row so they
+   don't truncate, pushing action buttons onto their own line. */
 @media (max-width: 640px) {
   .border-b.flex.items-center { flex-wrap: wrap; row-gap: 0.5rem; }
+  .border-b.flex.items-center > .flex-1 { flex-basis: 100%; }
   input.w-72, input.w-56, input.w-48 { width: 100% !important; }
 }

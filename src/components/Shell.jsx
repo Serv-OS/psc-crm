@@ -202,11 +202,13 @@ export default function Shell({ session }) {
         />
       </div>
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-      <div className="flex items-stretch border-b border-bdr">
+      <div className="flex flex-wrap lg:flex-nowrap items-stretch border-b border-bdr">
         <button onClick={() => setSidebarOpen(true)}
-          className="lg:hidden px-3 glass flex items-center text-paper text-xl shrink-0" title="Menu">{'☰'}</button>
-        <div className="flex-1 min-w-0"><PhoneBar profile={profile} /></div>
-        <div className="glass flex items-center gap-2 px-3 shrink-0">
+          className="order-1 lg:hidden px-4 glass flex items-center text-paper text-xl shrink-0" title="Menu">{'☰'}</button>
+        <div className="order-3 lg:order-1 w-full lg:w-auto lg:flex-1 min-w-0 border-t lg:border-t-0 border-bdr">
+          <PhoneBar profile={profile} />
+        </div>
+        <div className="order-2 lg:order-2 flex-1 lg:flex-none flex items-center justify-end gap-2 px-3 glass">
           <GlobalSearch onNavigate={navigateTo} />
           <NotificationBell profile={profile} onNavigate={navigateTo} />
         </div>

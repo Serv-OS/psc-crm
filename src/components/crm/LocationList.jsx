@@ -97,7 +97,24 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <table className="w-full">
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-bdr">
+          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
+          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">No locations.</div>}
+          {!loading && filtered.map(l => (
+            <button key={l.id} onClick={() => onSelect(l.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{l.name}</span>
+                {leadFor(l.id) && <LeadBadge stage={leadFor(l.id).stage} />}
+                <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STATUS_COLORS[l.status] || 'bg-card text-dim'}`}>{l.status}</span>
+              </div>
+              <div className="text-xs text-muted truncate">{companyName(l.company_id)}</div>
+              <div className="text-[10px] text-dim">{[l.city, l.venue_type, l.covers ? `${l.covers} covers` : ''].filter(Boolean).join(' · ')}</div>
+            </button>
+          ))}
+        </div>
+
+        <table className="w-full hidden sm:table">
           <thead>
             <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
               <th className="px-6 py-2.5 text-left">Location</th>

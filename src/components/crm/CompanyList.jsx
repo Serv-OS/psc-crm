@@ -129,7 +129,23 @@ export default function CompanyList({ profile, onSelect }) {
       )}
 
       <div className="flex-1 overflow-y-auto">
-        <table className="w-full">
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-bdr">
+          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
+          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">{search ? 'No companies match.' : 'No companies yet.'}</div>}
+          {!loading && filtered.map(c => (
+            <button key={c.id} onClick={() => onSelect(c.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{c.name}</span>
+                {leadFor(c.id) && <LeadBadge stage={leadFor(c.id).stage} />}
+              </div>
+              <div className="text-xs text-muted truncate">{[c.domain, c.city].filter(Boolean).join(' · ')}</div>
+              <div className="text-[10px] text-dim">{locCount(c.id)} location{locCount(c.id) !== 1 ? 's' : ''} · {liveCount(c.id)} live · {ownerName(c.owner_id)}</div>
+            </button>
+          ))}
+        </div>
+
+        <table className="w-full hidden sm:table">
           <thead>
             <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
               <th className="px-6 py-2.5 text-left">Company</th>

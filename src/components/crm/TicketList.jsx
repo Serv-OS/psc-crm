@@ -179,7 +179,28 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
       )}
 
       <div className="flex-1 overflow-y-auto">
-        <table className="w-full">
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-bdr">
+          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
+          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">No tickets.</div>}
+          {!loading && filtered.map(t => (
+            <button key={t.id} onClick={() => onSelect(t.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-mono font-bold text-ember shrink-0">{t.ticket_number ? `#${t.ticket_number}` : '--'}</span>
+                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{t.subject}</span>
+                <span className={`text-xs font-bold ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {companyName(t.company_id) && <span className="text-xs text-muted">{companyName(t.company_id)}</span>}
+                <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STAGE_STYLES[t.stage]}`}>{STAGE_LABELS[t.stage] || t.stage}</span>
+                <SlaBadge ticket={t} />
+                <span className="text-[10px] text-dim ml-auto">{ownerName(t.owner_id)} · {new Date(t.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <table className="w-full hidden sm:table">
           <thead>
             <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
               <th className="px-6 py-2.5 text-left">Ticket</th>
