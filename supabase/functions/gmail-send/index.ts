@@ -26,8 +26,10 @@ async function getAccessToken(supabase: any): Promise<string> {
     .limit(1)
     .single();
 
-  const refreshToken = conn?.refresh_token || Deno.env.get("GMAIL_REFRESH_TOKEN");
-  if (!refreshToken) throw new Error("No Gmail connection found. Connect Gmail in Settings.");
+  // Only send from an account explicitly connected via the in-app flow.
+  // No fallback to a GMAIL_REFRESH_TOKEN secret (that was a personal inbox).
+  const refreshToken = conn?.refresh_token;
+  if (!refreshToken) throw new Error("No Gmail account connected. Connect a support mailbox in Settings.");
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",

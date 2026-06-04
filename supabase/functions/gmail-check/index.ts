@@ -13,11 +13,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function getAccessToken(supabase: any): Promise<string> {
+async function getAccessToken(supabase: any): Promise<string | null> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID")!;
   const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET")!;
 
-  // Try database first (in-app OAuth connection)
+  // ONLY use an account explicitly connected via the in-app "Connect Gmail"
+  // flow (gmail_connections). We deliberately do NOT fall back to a
+  // GMAIL_REFRESH_TOKEN secret — that previously pointed at a personal
+  // inbox (peter@serv-os.app) and polled it as if it were the support box.
   const { data: conn } = await supabase
     .from("gmail_connections")
     .select("refresh_token, access_token, token_expires_at")
@@ -26,8 +29,8 @@ async function getAccessToken(supabase: any): Promise<string> {
     .limit(1)
     .single();
 
-  const refreshToken = conn?.refresh_token || Deno.env.get("GMAIL_REFRESH_TOKEN");
-  if (!refreshToken) throw new Error("No Gmail connection found. Connect Gmail in Settings.");
+  const refreshToken = conn?.refresh_token;
+  if (!refreshToken) return null; // nothing connected -> caller no-ops
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -137,6 +140,25 @@ serve(async (req) => {
     );
 
     const accessToken = await getAccessToken(supabase);
+
+    // No Gmail account connected via the in-app flow -> do nothing.
+    // (Email support resumes automatically once support@ is connected.)
+    if (!accessToken) {
+      return new Response(
+        JSON.stringify({ success: true, processed: 0, total: 0, connected_mailbox: null, note: "No Gmail account connected" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Which mailbox is actually being polled? (diagnostic)
+    let connectedMailbox = "unknown";
+    try {
+      const prof = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const pd = await prof.json();
+      connectedMailbox = pd.emailAddress || "unknown";
+    } catch (_) { /* ignore */ }
 
     // Build the set of internal senders that must NOT create support tickets:
     // our own connected mailboxes + every system user's email. Combined with
@@ -340,7 +362,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, processed, total: messages.length }),
+      JSON.stringify({ success: true, processed, total: messages.length, connected_mailbox: connectedMailbox }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
