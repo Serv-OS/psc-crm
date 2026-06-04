@@ -19,12 +19,10 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [leadFilter, setLeadFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const blankLoc = { name: '', company_id: '', new_company: '', address: '', city: '', postcode: '', phone: '', email: '', venue_type: '', covers: '', status: 'prospect', notes: '' };
   const [showCreate, setShowCreate] = useState(false);
-  const [nName, setNName] = useState('');
-  const [nCompany, setNCompany] = useState('');
-  const [nNewCompany, setNNewCompany] = useState('');
-  const [nCity, setNCity] = useState('');
-  const [nVenue, setNVenue] = useState('');
+  const [nl, setNl] = useState(blankLoc);
+  const setL = (k, v) => setNl(p => ({ ...p, [k]: v }));
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
@@ -32,38 +30,52 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
 
   const createLocation = async (e) => {
     e.preventDefault();
-    if (!nName.trim()) { alert('Enter a location name.'); return; }
-    let companyId = nCompany;
-    if (nCompany === '__new__') {
-      if (!nNewCompany.trim()) { alert('Enter the new company name.'); return; }
-      const { data: co, error: cErr } = await supabase.from('companies').insert({ name: nNewCompany.trim(), owner_id: profile.id }).select('id').single();
+    if (!nl.name.trim()) { alert('Enter a location name.'); return; }
+    let companyId = nl.company_id;
+    if (companyId === '__new__') {
+      if (!nl.new_company.trim()) { alert('Enter the new company name.'); return; }
+      const { data: co, error: cErr } = await supabase.from('companies').insert({ name: nl.new_company.trim(), owner_id: profile.id }).select('id').single();
       if (cErr) { alert('Could not create company: ' + cErr.message); return; }
       companyId = co.id;
     }
     if (!companyId) { alert('Select or create a company for this location.'); return; }
     const { data, error } = await supabase.from('locations').insert({
-      name: nName.trim(), company_id: companyId, city: nCity.trim() || null,
-      venue_type: nVenue || null, status: 'prospect', owner_id: profile.id,
+      name: nl.name.trim(), company_id: companyId,
+      address: nl.address.trim() || null, city: nl.city.trim() || null, postcode: nl.postcode.trim() || null,
+      phone: nl.phone.trim() || null, email: nl.email.trim() || null,
+      venue_type: nl.venue_type || null, covers: nl.covers ? parseInt(nl.covers) : null,
+      status: nl.status || 'prospect', notes: nl.notes.trim() || null, owner_id: profile.id,
     }).select('id').single();
     if (error) { alert('Could not create location: ' + error.message); return; }
-    setNName(''); setNCompany(''); setNNewCompany(''); setNCity(''); setNVenue(''); setShowCreate(false);
+    setNl(blankLoc); setShowCreate(false);
     if (data) onSelect(data.id); else load();
   };
 
+  const [associations, setAssociations] = useState([]);
+  const [contacts, setContacts] = useState([]);
+
   const load = async () => {
     setLoading(true);
-    const [l, c, ld] = await Promise.all([
+    const [l, c, ld, a, ct] = await Promise.all([
       supabase.from('locations').select('*').order('name'),
       supabase.from('companies').select('id, name'),
       supabase.from('leads').select('id, location_id, stage, name'),
+      supabase.from('associations').select('*').eq('to_type', 'location').eq('from_type', 'contact'),
+      supabase.from('contacts').select('id, first_name, last_name'),
     ]);
     setLocations(l.data || []);
     setCompanies(c.data || []);
     setLeads(ld.data || []);
+    setAssociations(a.data || []);
+    setContacts(ct.data || []);
     setLoading(false);
   };
 
   const leadFor = (locationId) => primaryLead(leads.filter(l => l.location_id === locationId));
+  const contactNames = (locationId) => associations
+    .filter(a => a.to_id === locationId)
+    .map(a => { const c = contacts.find(x => x.id === a.from_id); return c ? [c.first_name, c.last_name].filter(Boolean).join(' ') : null; })
+    .filter(Boolean).join(', ');
 
   const filtered = useMemo(() => {
     let result = locations;
@@ -112,28 +124,45 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
 
       {showCreate && (
         <div className="px-6 py-4 border-b border-bdr">
-          <form onSubmit={createLocation} className="flex flex-wrap gap-2 items-center">
-            <input className="flex-1 min-w-[180px] px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember"
-              value={nName} onChange={e => setNName(e.target.value)} placeholder="Location name" autoFocus />
-            <select className="px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper focus:outline-none focus:border-ember w-56"
-              value={nCompany} onChange={e => setNCompany(e.target.value)}>
-              <option value="">Select company…</option>
-              {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value="__new__">+ Create new company…</option>
-            </select>
-            {nCompany === '__new__' && (
-              <input className="px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember w-48"
-                value={nNewCompany} onChange={e => setNNewCompany(e.target.value)} placeholder="New company name" />
-            )}
-            <input className="px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember w-36"
-              value={nCity} onChange={e => setNCity(e.target.value)} placeholder="City" />
-            <select className="px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper focus:outline-none focus:border-ember w-40"
-              value={nVenue} onChange={e => setNVenue(e.target.value)}>
-              <option value="">Venue type…</option>
-              {['restaurant','bar','cafe','fast_casual','qsr','hotel_fb','nightclub','food_hall','catering','other'].map(v => <option key={v} value={v}>{v.replace(/_/g,' ')}</option>)}
-            </select>
-            <button type="submit" className="px-4 py-2 bg-ember text-white text-sm font-semibold rounded-xl shrink-0">Create</button>
-            <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-2 text-sm text-muted border border-bdr rounded-xl shrink-0">Cancel</button>
+          <form onSubmit={createLocation} className="space-y-3 max-w-3xl">
+            {(() => { const input = "w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember"; const label = "text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block"; return (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div><label className={label}>Location name *</label><input className={input} value={nl.name} onChange={e => setL('name', e.target.value)} autoFocus /></div>
+                  <div><label className={label}>Company *</label>
+                    <select className={input} value={nl.company_id} onChange={e => setL('company_id', e.target.value)}>
+                      <option value="">Select company…</option>
+                      {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <option value="__new__">+ Create new company…</option>
+                    </select></div>
+                  {nl.company_id === '__new__' && <div className="sm:col-span-2"><label className={label}>New company name</label><input className={input} value={nl.new_company} onChange={e => setL('new_company', e.target.value)} /></div>}
+                  <div><label className={label}>Address</label><input className={input} value={nl.address} onChange={e => setL('address', e.target.value)} /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className={label}>City</label><input className={input} value={nl.city} onChange={e => setL('city', e.target.value)} /></div>
+                    <div><label className={label}>Postcode</label><input className={input} value={nl.postcode} onChange={e => setL('postcode', e.target.value)} /></div>
+                  </div>
+                  <div><label className={label}>Phone</label><input className={input} value={nl.phone} onChange={e => setL('phone', e.target.value)} /></div>
+                  <div><label className={label}>Email</label><input className={input} value={nl.email} onChange={e => setL('email', e.target.value)} /></div>
+                  <div><label className={label}>Venue type</label>
+                    <select className={input} value={nl.venue_type} onChange={e => setL('venue_type', e.target.value)}>
+                      <option value="">Select…</option>
+                      {['restaurant','bar','cafe','fast_casual','qsr','hotel_fb','nightclub','food_hall','catering','other'].map(v => <option key={v} value={v}>{v.replace(/_/g,' ')}</option>)}
+                    </select></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className={label}>Covers</label><input type="number" className={input} value={nl.covers} onChange={e => setL('covers', e.target.value)} /></div>
+                    <div><label className={label}>Status</label>
+                      <select className={input} value={nl.status} onChange={e => setL('status', e.target.value)}>
+                        <option value="prospect">Prospect</option><option value="onboarding">Onboarding</option><option value="live">Live</option><option value="churned">Churned</option>
+                      </select></div>
+                  </div>
+                </div>
+                <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={2} value={nl.notes} onChange={e => setL('notes', e.target.value)} /></div>
+                <div className="flex gap-2">
+                  <button type="submit" className="px-4 py-2 bg-ember text-white text-sm font-semibold rounded-xl">Create location</button>
+                  <button type="button" onClick={() => { setShowCreate(false); setNl(blankLoc); }} className="px-3 py-2 text-sm text-muted border border-bdr rounded-xl">Cancel</button>
+                </div>
+              </>
+            ); })()}
           </form>
         </div>
       )}
@@ -176,6 +205,7 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
               } />
               <ChipRow>
                 <Chip tone="slate" icon={'\u{1F3E2}'}>{companyName(l.company_id)}</Chip>
+                <Chip tone="slate" icon={'\u{1F464}'}>{contactNames(l.id)}</Chip>
                 <Chip icon={'\u{1F4CD}'}>{l.city}</Chip>
                 <Chip>{l.venue_type}</Chip>
                 <Chip>{l.covers ? `${l.covers} covers` : ''}</Chip>

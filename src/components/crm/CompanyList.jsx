@@ -62,24 +62,25 @@ export default function CompanyList({ profile, onSelect }) {
     return m ? (m.display_name || m.email.split('@')[0]) : '';
   };
 
+  const blank = { name: '', domain: '', industry: '', phone: '', email: '', website: '', address: '', city: '', postcode: '', country: '', notes: '' };
   const [showCreate, setShowCreate] = useState(false);
-  const [name, setName] = useState('');
-  const [domain, setDomain] = useState('');
+  const [nc, setNc] = useState(blank);
+  const set = (k, v) => setNc(p => ({ ...p, [k]: v }));
 
   const create = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    const { data } = await supabase.from('companies').insert({
-      name: name.trim(),
-      domain: domain.trim() || null,
-      owner_id: profile.id,
-    }).select().single();
-    setName(''); setDomain(''); setShowCreate(false);
-    if (data) onSelect(data.id);
-    else load();
+    if (!nc.name.trim()) { alert('Enter a company name.'); return; }
+    const payload = { owner_id: profile.id };
+    Object.keys(blank).forEach(k => { payload[k] = nc[k]?.trim() ? nc[k].trim() : null; });
+    payload.name = nc.name.trim();
+    const { data, error } = await supabase.from('companies').insert(payload).select().single();
+    if (error) { alert('Could not create company: ' + error.message); return; }
+    setNc(blank); setShowCreate(false);
+    if (data) onSelect(data.id); else load();
   };
 
-  const input = "w-full px-3 py-2 bg-card border border-bdr rounded text-sm text-paper placeholder-dim focus:outline-none focus:border-ember";
+  const input = "w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember";
+  const label = "text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block";
 
   return (
     <div className="h-full flex flex-col">
@@ -112,19 +113,26 @@ export default function CompanyList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
-          <form onSubmit={create} className="flex gap-2 items-end">
-            <div className="flex-1">
-              <input className={input} value={name} onChange={e => setName(e.target.value)}
-                placeholder="Company name" autoFocus />
+        <div className="px-6 py-4 border-b border-bdr">
+          <form onSubmit={create} className="space-y-3 max-w-3xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><label className={label}>Company name *</label><input className={input} value={nc.name} onChange={e => set('name', e.target.value)} autoFocus /></div>
+              <div><label className={label}>Industry</label><input className={input} value={nc.industry} onChange={e => set('industry', e.target.value)} placeholder="e.g. Restaurant group" /></div>
+              <div><label className={label}>Domain</label><input className={input} value={nc.domain} onChange={e => set('domain', e.target.value)} placeholder="example.com" /></div>
+              <div><label className={label}>Website</label><input className={input} value={nc.website} onChange={e => set('website', e.target.value)} placeholder="https://" /></div>
+              <div><label className={label}>Phone</label><input className={input} value={nc.phone} onChange={e => set('phone', e.target.value)} /></div>
+              <div><label className={label}>Email</label><input className={input} value={nc.email} onChange={e => set('email', e.target.value)} /></div>
+              <div><label className={label}>Address</label><input className={input} value={nc.address} onChange={e => set('address', e.target.value)} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={label}>City</label><input className={input} value={nc.city} onChange={e => set('city', e.target.value)} /></div>
+                <div><label className={label}>Postcode</label><input className={input} value={nc.postcode} onChange={e => set('postcode', e.target.value)} /></div>
+              </div>
             </div>
-            <div className="w-48">
-              <input className={input} value={domain} onChange={e => setDomain(e.target.value)}
-                placeholder="Domain (optional)" />
+            <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={2} value={nc.notes} onChange={e => set('notes', e.target.value)} /></div>
+            <div className="flex gap-2">
+              <button type="submit" className="px-4 py-2 bg-ember text-white text-sm font-semibold rounded-xl">Create company</button>
+              <button type="button" onClick={() => { setShowCreate(false); setNc(blank); }} className="px-3 py-2 text-sm text-muted border border-bdr rounded-xl">Cancel</button>
             </div>
-            <button type="submit" className="px-4 py-2 bg-ember text-ink text-sm font-semibold rounded">Create</button>
-            <button type="button" onClick={() => setShowCreate(false)}
-              className="px-3 py-2 text-sm text-muted border border-bdr rounded">Cancel</button>
           </form>
         </div>
       )}
