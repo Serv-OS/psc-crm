@@ -24,6 +24,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
   const [products, setProducts] = useState([]);
   const [company, setCompany] = useState(null);
   const [contact, setContact] = useState(null);
+  const [locations, setLocations] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -40,7 +41,12 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
     setQuote(q.data);
     setItems((li.data || []).map(x => ({ ...x })));
     setProducts(pr.data || []);
-    if (q.data?.company_id) supabase.from('companies').select('id, name').eq('id', q.data.company_id).single().then(r => setCompany(r.data));
+    if (q.data?.company_id) {
+      supabase.from('companies').select('id, name').eq('id', q.data.company_id).single().then(r => setCompany(r.data));
+      supabase.from('locations').select('id, name').eq('company_id', q.data.company_id).order('name').then(r => setLocations(r.data || []));
+    } else {
+      supabase.from('locations').select('id, name').order('name').limit(200).then(r => setLocations(r.data || []));
+    }
     if (q.data?.contact_id) supabase.from('contacts').select('id, first_name, last_name, email').eq('id', q.data.contact_id).single().then(r => setContact(r.data));
   };
 
@@ -71,7 +77,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
       valid_until: quote.valid_until || null, go_live_date: quote.go_live_date || null,
       payment_terms: quote.payment_terms, deposit_percent: Number(quote.deposit_percent) || 0,
       tax_rate: Number(quote.tax_rate) || 0, terms: quote.terms || null, notes: quote.notes || null,
-      status: quote.status,
+      status: quote.status, location_id: quote.location_id || null,
       one_off_subtotal: totals.oneOff, tax_amount: totals.tax, one_off_total: totals.oneOffTotal,
       recurring_arr: totals.recurringArr,
     }).eq('id', quoteId);
@@ -204,6 +210,11 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={label}>Status</label><select className={input} value={quote.status} onChange={e => setQ('status', e.target.value)}>
                   {['draft','sent','viewed','signed','paid','won','declined','expired','void'].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                <div className="col-span-2"><label className={label}>Location (install site)</label>
+                  <select className={input} value={quote.location_id || ''} onChange={e => setQ('location_id', e.target.value || null)}>
+                    <option value="">— None —</option>
+                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select></div>
                 <div><label className={label}>Valid until</label><input type="date" className={input} value={quote.valid_until || ''} onChange={e => setQ('valid_until', e.target.value)} /></div>
                 <div><label className={label}>Go-live date</label><input type="date" className={input} value={quote.go_live_date || ''} onChange={e => setQ('go_live_date', e.target.value)} /></div>
                 <div><label className={label}>Payment terms</label><select className={input} value={quote.payment_terms} onChange={e => setQ('payment_terms', e.target.value)}>

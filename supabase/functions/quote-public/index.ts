@@ -27,22 +27,31 @@ serve(async (req) => {
     if (!quote) return json({ error: "Quote not found" }, 404);
 
     if (req.method === "GET") {
-      const [{ data: items }, { data: company }, { data: settings }] = await Promise.all([
+      const [{ data: items }, { data: company }, { data: contact }, { data: location }, { data: settings }] = await Promise.all([
         supabase.from("quote_line_items").select("*").eq("quote_id", quote.id).order("sort"),
-        quote.company_id ? supabase.from("companies").select("name").eq("id", quote.company_id).single() : Promise.resolve({ data: null }),
-        supabase.from("support_settings").select("quote_terms").eq("id", 1).maybeSingle(),
+        quote.company_id ? supabase.from("companies").select("name, address, city, postcode").eq("id", quote.company_id).maybeSingle() : Promise.resolve({ data: null }),
+        quote.contact_id ? supabase.from("contacts").select("first_name, last_name, email, phone").eq("id", quote.contact_id).maybeSingle() : Promise.resolve({ data: null }),
+        quote.location_id ? supabase.from("locations").select("name, address, city, postcode").eq("id", quote.location_id).maybeSingle() : Promise.resolve({ data: null }),
+        supabase.from("support_settings").select("quote_terms, business_name, business_address, business_email, business_phone, quote_accent").eq("id", 1).maybeSingle(),
       ]);
-      // Mark viewed
       if (quote.status === "sent") await supabase.from("quotes").update({ status: "viewed" }).eq("id", quote.id);
       const expired = quote.valid_until && new Date(quote.valid_until) < new Date(new Date().toDateString()) && !["won", "paid", "signed"].includes(quote.status);
+      const s = settings || {};
       return json({
         quote: {
           number: quote.quote_number, status: quote.status, valid_until: quote.valid_until, go_live_date: quote.go_live_date,
           payment_terms: quote.payment_terms, deposit_percent: quote.deposit_percent,
           one_off_subtotal: quote.one_off_subtotal, tax_amount: quote.tax_amount, one_off_total: quote.one_off_total,
-          recurring_arr: quote.recurring_arr, terms: quote.terms || settings?.quote_terms || "", signed: !!quote.signed_at, expired,
+          recurring_arr: quote.recurring_arr, terms: quote.terms || s.quote_terms || "",
+          signed: !!quote.signed_at, signed_by_name: quote.signed_by_name, created_at: quote.created_at, expired,
         },
-        company_name: company?.name || "",
+        seller: {
+          name: s.business_name || "ServOS", address: s.business_address || "",
+          email: s.business_email || "", phone: s.business_phone || "", accent: s.quote_accent || "#E8743C",
+        },
+        company: company ? { name: company.name, address: [company.address, company.city, company.postcode].filter(Boolean).join(", ") } : null,
+        contact: contact ? { name: [contact.first_name, contact.last_name].filter(Boolean).join(" "), email: contact.email, phone: contact.phone } : null,
+        location: location ? { name: location.name, address: [location.address, location.city, location.postcode].filter(Boolean).join(", ") } : null,
         items: items || [],
       });
     }
