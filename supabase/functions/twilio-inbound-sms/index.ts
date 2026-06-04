@@ -89,6 +89,8 @@ serve(async (req) => {
 
     // Find existing open ticket for this phone number
     let ticketId: string | null = null;
+    let isNewTicket = false;
+    let ticketNumber: number | null = null;
 
     const { data: openTickets } = await supabase
       .from("tickets")
@@ -136,6 +138,8 @@ serve(async (req) => {
 
       if (newTicket) {
         ticketId = newTicket.id;
+        isNewTicket = true;
+        ticketNumber = newTicket.ticket_number ?? null;
 
         await supabase.from("stage_history").insert({
           object_type: "ticket", object_id: ticketId,
@@ -173,7 +177,28 @@ serve(async (req) => {
       });
     }
 
-    // Return empty TwiML (no auto-reply, agents reply from CRM)
+    // Auto-reply on first contact only (avoid replying to every message)
+    if (isNewTicket) {
+      const { data: vs } = await supabase.from("support_settings")
+        .select("auto_reply_sms_enabled, auto_reply_sms_message").eq("id", 1).single();
+      if (vs?.auto_reply_sms_enabled && vs?.auto_reply_sms_message) {
+        const reply = vs.auto_reply_sms_message
+          .replace(/\{\{\s*contact_name\s*\}\}/g, contactName || "there")
+          .replace(/\{\{\s*ticket_number\s*\}\}/g, ticketNumber ? `#${ticketNumber}` : "")
+          .trim();
+        // Log the auto-reply as an outbound activity
+        if (ticketId) {
+          await supabase.from("crm_activities").insert({
+            type: "sms", body: reply, subject_type: "ticket", subject_id: ticketId,
+            direction: "outbound", is_internal: false,
+            channel_metadata: { auto_reply: true, to_number: normalizedFrom },
+          });
+        }
+        return twimlResponse(reply);
+      }
+    }
+
+    // No auto-reply: agents reply from the CRM
     return twimlResponse("");
   } catch (error) {
     console.error("Twilio inbound error:", error);
@@ -181,9 +206,13 @@ serve(async (req) => {
   }
 });
 
+function xmlEscape(s: string): string {
+  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 function twimlResponse(message: string): Response {
   const twiml = message
-    ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`
+    ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${xmlEscape(message)}</Message></Response>`
     : `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
 
   return new Response(twiml, {

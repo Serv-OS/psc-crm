@@ -60,6 +60,11 @@ export default function SettingsPanel({ profile }) {
       prefer_online: next.prefer_online,
       voice_greeting: next.voice_greeting ?? null,
       voicemail_prompt: next.voicemail_prompt ?? null,
+      auto_reply_email_enabled: next.auto_reply_email_enabled ?? false,
+      auto_reply_email_subject: next.auto_reply_email_subject ?? null,
+      auto_reply_email_message: next.auto_reply_email_message ?? null,
+      auto_reply_sms_enabled: next.auto_reply_sms_enabled ?? false,
+      auto_reply_sms_message: next.auto_reply_sms_message ?? null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
   };
@@ -206,6 +211,76 @@ export default function SettingsPanel({ profile }) {
                 <div className="text-[11px] text-dim leading-relaxed pt-1 border-t border-bdr">
                   The greeting plays when a call comes in and agents are online. The voicemail message plays when no one is available or the call isn't answered — the caller's message is then recorded, transcribed and attached to a support ticket.
                   {!isOwner && <span className="block mt-1">Only owners can edit these.</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto-reply */}
+          {settings && (
+            <div className="glass-card rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-lg">{'\u{1F916}'}</div>
+                <div className="flex-1">
+                  <div className="text-base font-bold text-paper">Auto-reply</div>
+                  <div className="text-xs text-muted">Acknowledge inbound email &amp; SMS automatically (first message only)</div>
+                </div>
+              </div>
+              <div className="p-5 space-y-5">
+                {/* Email auto-reply */}
+                <div>
+                  <button type="button" disabled={!isOwner}
+                    onClick={() => saveSettings({ auto_reply_email_enabled: !settings.auto_reply_email_enabled })}
+                    className="w-full flex items-center gap-3 p-3 glass-inner rounded-xl text-left disabled:opacity-60">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-paper">Email auto-reply</div>
+                      <div className="text-xs text-muted">Sent from the connected support mailbox</div>
+                    </div>
+                    <div className={`relative w-10 h-6 rounded-full transition shrink-0 ${settings.auto_reply_email_enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${settings.auto_reply_email_enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </div>
+                  </button>
+                  <div className={`mt-2 space-y-2 ${settings.auto_reply_email_enabled ? '' : 'opacity-50 pointer-events-none'}`}>
+                    <input disabled={!isOwner}
+                      className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember disabled:opacity-60"
+                      value={settings.auto_reply_email_subject || ''}
+                      onChange={e => setSettings(s => ({ ...s, auto_reply_email_subject: e.target.value }))}
+                      onBlur={e => saveSettings({ auto_reply_email_subject: e.target.value })}
+                      placeholder="Subject line" />
+                    <textarea disabled={!isOwner} rows={4}
+                      className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember resize-none disabled:opacity-60"
+                      value={settings.auto_reply_email_message || ''}
+                      onChange={e => setSettings(s => ({ ...s, auto_reply_email_message: e.target.value }))}
+                      onBlur={e => saveSettings({ auto_reply_email_message: e.target.value })}
+                      placeholder="Auto-reply message" />
+                  </div>
+                </div>
+
+                {/* SMS auto-reply */}
+                <div className="pt-1 border-t border-bdr">
+                  <button type="button" disabled={!isOwner}
+                    onClick={() => saveSettings({ auto_reply_sms_enabled: !settings.auto_reply_sms_enabled })}
+                    className="w-full flex items-center gap-3 p-3 mt-3 glass-inner rounded-xl text-left disabled:opacity-60">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-paper">SMS auto-reply</div>
+                      <div className="text-xs text-muted">Texted back from the support number</div>
+                    </div>
+                    <div className={`relative w-10 h-6 rounded-full transition shrink-0 ${settings.auto_reply_sms_enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${settings.auto_reply_sms_enabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </div>
+                  </button>
+                  <div className={`mt-2 ${settings.auto_reply_sms_enabled ? '' : 'opacity-50 pointer-events-none'}`}>
+                    <textarea disabled={!isOwner} rows={2}
+                      className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember resize-none disabled:opacity-60"
+                      value={settings.auto_reply_sms_message || ''}
+                      onChange={e => setSettings(s => ({ ...s, auto_reply_sms_message: e.target.value }))}
+                      onBlur={e => saveSettings({ auto_reply_sms_message: e.target.value })}
+                      placeholder="Auto-reply text message" />
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-dim leading-relaxed pt-1 border-t border-bdr">
+                  Only the first message on a new ticket gets an auto-reply (no loops). Use <code className="bg-slate-100 px-1 rounded">{'{{contact_name}}'}</code> and <code className="bg-slate-100 px-1 rounded">{'{{ticket_number}}'}</code> as placeholders. Email auto-reply needs a connected support mailbox.
                 </div>
               </div>
             </div>

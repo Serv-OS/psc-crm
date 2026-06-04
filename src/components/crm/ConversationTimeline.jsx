@@ -26,6 +26,8 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
   const [callOutcome, setCallOutcome] = useState('connected');
   const [isInternal, setIsInternal] = useState(true);
   const [sending, setSending] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionPos, setMentionPos] = useState(0);
@@ -44,17 +46,37 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
   }, [activities]);
 
   const load = async () => {
-    const [a, m] = await Promise.all([
+    const [a, m, tpl] = await Promise.all([
       supabase.from('crm_activities')
         .select('*')
         .eq('subject_type', subjectType)
         .eq('subject_id', subjectId)
         .order('occurred_at', { ascending: true }),
       supabase.from('profiles').select('id, email, display_name'),
+      supabase.from('templates').select('*').order('name'),
     ]);
     setActivities(a.data || []);
     setMembers(m.data || []);
+    setTemplates(tpl.data || []);
   };
+
+  // Insert a template into the composer, filling placeholders
+  const applyTemplate = (t) => {
+    const ctx = {
+      contact_name: (contacts?.find(c => c.id === ticket?.contact_id)
+        ? [contacts.find(c => c.id === ticket.contact_id).first_name, contacts.find(c => c.id === ticket.contact_id).last_name].filter(Boolean).join(' ')
+        : '') || 'there',
+      ticket_number: ticket?.ticket_number ? `#${ticket.ticket_number}` : '',
+      company: '',
+      agent_name: profile.display_name || profile.email?.split('@')[0] || '',
+    };
+    const fill = (s) => (s || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => ctx[k] ?? '');
+    setBody(fill(t.body));
+    if (t.subject && channel === 'email') setSubject(fill(t.subject));
+    setShowTemplates(false);
+  };
+
+  const availableTemplates = templates.filter(t => t.channel === 'any' || t.channel === channel);
 
   const getName = (id) => {
     const m = members.find(u => u.id === id);
@@ -375,6 +397,27 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
                 {t.key === ticketChannel && t.key !== 'note' && <span className="text-[8px] ml-0.5">*</span>}
               </button>
             ))}
+
+            {/* Templates picker */}
+            {channel !== 'call' && availableTemplates.length > 0 && (
+              <div className="relative ml-auto">
+                <button onClick={() => setShowTemplates(v => !v)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-xl bg-card text-muted hover:text-paper transition">
+                  {'\u{1F4C4}'} Templates {'\u{25BE}'}
+                </button>
+                {showTemplates && (
+                  <div className="absolute right-0 bottom-full mb-1 w-64 max-h-60 overflow-y-auto glass-card rounded-xl shadow-xl z-30">
+                    {availableTemplates.map(t => (
+                      <button key={t.id} onClick={() => applyTemplate(t)}
+                        className="w-full px-3 py-2 text-left hover:bg-card/60 border-b border-bdr last:border-b-0">
+                        <div className="text-sm text-paper">{t.name}</div>
+                        <div className="text-[10px] text-dim truncate">{t.body}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Email fields */}

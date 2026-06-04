@@ -96,6 +96,32 @@ function getHeader(headers: any[], name: string): string {
   return h?.value || "";
 }
 
+// Send a threaded plain-text reply via the Gmail API (used for auto-reply)
+async function sendGmailReply(accessToken: string, opts: {
+  from: string; to: string; subject: string; body: string;
+  inReplyTo?: string; references?: string; threadId?: string;
+}): Promise<boolean> {
+  const lines = [
+    `From: ${opts.from}`,
+    `To: ${opts.to}`,
+    `Subject: ${opts.subject}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+  ];
+  if (opts.inReplyTo) lines.push(`In-Reply-To: ${opts.inReplyTo}`);
+  const refs = opts.references || opts.inReplyTo;
+  if (refs) lines.push(`References: ${refs}`);
+  const raw = `${lines.join("\r\n")}\r\n\r\n${opts.body}`;
+  const encoded = btoa(unescape(encodeURIComponent(raw)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw: encoded, threadId: opts.threadId }),
+  });
+  return res.ok;
+}
+
 function extractEmail(str: string): string {
   const match = str.match(/<([^>]+)>/) || str.match(/([^\s<>]+@[^\s<>]+)/);
   return match ? match[1].toLowerCase() : str.toLowerCase().trim();
@@ -327,6 +353,34 @@ serve(async (req) => {
             ticket_id: ticketId,
             email_thread_id: gmailThreadId,
           });
+
+          // Auto-reply on first contact only
+          try {
+            const { data: vs } = await supabase.from("support_settings")
+              .select("auto_reply_email_enabled, auto_reply_email_subject, auto_reply_email_message")
+              .eq("id", 1).single();
+            if (vs?.auto_reply_email_enabled) {
+              const replyBody = (vs.auto_reply_email_message || "")
+                .replace(/\{\{\s*contact_name\s*\}\}/g, senderName || "there")
+                .replace(/\{\{\s*ticket_number\s*\}\}/g, newTicket.ticket_number ? `#${newTicket.ticket_number}` : "");
+              const replySubject = vs.auto_reply_email_subject || "We received your message";
+              const fromAddr = connectedMailbox && connectedMailbox !== "unknown" ? connectedMailbox : senderEmail;
+              const ok = await sendGmailReply(accessToken, {
+                from: fromAddr, to: senderEmail, subject: replySubject, body: replyBody,
+                inReplyTo: messageId, references: references || messageId, threadId: gmailThreadId,
+              });
+              if (ok) {
+                await supabase.from("crm_activities").insert({
+                  type: "email", subject: replySubject, body: replyBody,
+                  subject_type: "ticket", subject_id: ticketId, direction: "outbound",
+                  is_internal: false, thread_id: gmailThreadId,
+                  channel_metadata: { auto_reply: true, to: senderEmail },
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Auto-reply email failed:", e);
+          }
         }
       }
 

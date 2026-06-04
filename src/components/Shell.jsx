@@ -34,6 +34,7 @@ import ReportingDashboard from './crm/ReportingDashboard.jsx';
 import SettingsPanel from './crm/SettingsPanel.jsx';
 import FormsList from './crm/FormsList.jsx';
 import FormBuilder from './crm/FormBuilder.jsx';
+import TemplatesPanel from './crm/TemplatesPanel.jsx';
 
 export default function Shell({ session }) {
   const [profile, setProfile]   = useState(null);
@@ -140,6 +141,8 @@ export default function Shell({ session }) {
         return <SettingsPanel profile={profile} />;
       case 'account':
         return <AccountPanel profile={profile} onSaved={refreshProfile} />;
+      case 'templates':
+        return <TemplatesPanel profile={profile} />;
       case 'forms':
         return <FormsList profile={profile} onSelect={(id) => { setView('form_detail'); setDetailId(id); }} />;
       case 'form_detail':
