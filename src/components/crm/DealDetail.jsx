@@ -22,6 +22,7 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
   const [locations, setLocations] = useState([]);
   const [history, setHistory] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [quotes, setQuotes] = useState([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
 
@@ -30,13 +31,14 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
   useEffect(() => { load(); }, [dealId]);
 
   const load = async () => {
-    const [d, m, c, l, h, prj] = await Promise.all([
+    const [d, m, c, l, h, prj, qz] = await Promise.all([
       supabase.from('deals').select('*').eq('id', dealId).single(),
       supabase.from('profiles').select('id, email, display_name'),
       supabase.from('companies').select('id, name').order('name'),
       supabase.from('locations').select('id, name, company_id, venue_type, city').order('name'),
       supabase.from('stage_history').select('*').eq('object_type', 'deal').eq('object_id', dealId).order('changed_at', { ascending: false }),
       supabase.from('crm_projects').select('*').eq('subject_type', 'deal').eq('subject_id', dealId).order('created_at', { ascending: false }),
+      supabase.from('quotes').select('*').eq('deal_id', dealId).order('created_at', { ascending: false }),
     ]);
     setDeal(d.data);
     setMembers(m.data || []);
@@ -44,7 +46,23 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
     setLocations(l.data || []);
     setHistory(h.data || []);
     setProjects(prj.data || []);
+    setQuotes(qz.data || []);
     if (d.data?.company_id) setCompany(c.data?.find(co => co.id === d.data.company_id) || null);
+  };
+
+  const createQuote = async () => {
+    // Find the deal's primary contact (if linked) to prefill the quote
+    const { data: assoc } = await supabase.from('associations').select('to_id, from_id, from_type, to_type')
+      .or(`and(from_type.eq.deal,from_id.eq.${dealId},to_type.eq.contact),and(to_type.eq.deal,to_id.eq.${dealId},from_type.eq.contact)`)
+      .limit(1);
+    const contactId = assoc && assoc.length ? (assoc[0].from_type === 'contact' ? assoc[0].from_id : assoc[0].to_id) : null;
+    const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const { data, error } = await supabase.from('quotes').insert({
+      deal_id: dealId, company_id: deal.company_id || null, contact_id: contactId,
+      tax_rate: 20, payment_terms: 'pay_now', valid_until: validUntil, created_by: profile.id,
+    }).select().single();
+    if (error) { alert('Could not create quote: ' + error.message); return; }
+    onNavigate?.('quote', data.id);
   };
 
   const startEdit = () => { setDraft({ ...deal }); setEditing(true); };
@@ -261,8 +279,26 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
               </Card>
             </div>
 
-            {/* RIGHT: Projects + Stage History */}
+            {/* RIGHT: Quotes + Projects + Stage History */}
             <div className="col-span-4 space-y-4">
+              <Card title="Quotes" count={quotes.length}
+                action={canWrite ? { label: '+ New quote', onClick: createQuote } : null}>
+                {quotes.length > 0 ? (
+                  <div className="space-y-2">
+                    {quotes.map(q => (
+                      <div key={q.id} onClick={() => onNavigate?.('quote', q.id)}
+                        className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-paper">Quote #{q.quote_number}</div>
+                          <div className="text-xs text-muted">£{Number(q.one_off_total || 0).toLocaleString('en-GB')} one-off{q.recurring_arr > 0 ? ` · £${Number(q.recurring_arr).toLocaleString('en-GB')} ARR` : ''}</div>
+                        </div>
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-slate-100 text-slate-600 border border-slate-200">{q.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <div className="text-xs text-dim italic py-3 text-center">No quotes yet</div>}
+              </Card>
+
               <Card title="Projects" count={projects.length}
                 action={canWrite ? { label: '+ Create', onClick: createLinkedProject } : null}>
                 {projects.length > 0 ? (

@@ -193,6 +193,7 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
           { key: 'contacts',         icon: '\u{1F464}', label: 'Contacts' },
           { key: 'leads',            icon: '\u{1F3AF}', label: 'Leads' },
           { key: 'deals',            icon: '\u{1F4B0}', label: 'Deals' },
+          { key: 'products',         icon: '\u{1F4E6}', label: 'Products' },
           { key: 'onboarding',       icon: '\u{1F680}', label: 'Onboarding' },
           { key: 'projects',         icon: '\u{1F4C1}', label: 'Projects' },
           { key: 'tasks',            icon: '\u{2611}',  label: 'Tasks' },

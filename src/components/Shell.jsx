@@ -39,6 +39,8 @@ import TemplatesPanel from './crm/TemplatesPanel.jsx';
 import MyWork from './crm/MyWork.jsx';
 import DataPanel from './crm/DataPanel.jsx';
 import LeadDetail from './crm/LeadDetail.jsx';
+import ProductsPanel from './crm/ProductsPanel.jsx';
+import QuoteBuilder from './crm/QuoteBuilder.jsx';
 
 export default function Shell({ session }) {
   const [profile, setProfile]   = useState(null);
@@ -91,6 +93,7 @@ export default function Shell({ session }) {
     else if (type === 'project') { setView('project_detail'); setDetailId(id); }
     else if (type === 'task') { setView('task_detail'); setDetailId(id); }
     else if (type === 'lead') { if (id) { setView('lead_detail'); setDetailId(id); } else setView('leads'); }
+    else if (type === 'quote') { setView('quote_detail'); setDetailId(id); }
     // List shortcuts (used by My Work "View all")
     else if (type === 'ticket_list') { setView('tickets'); }
     else if (type === 'task_list') { setView('tasks'); }
@@ -153,6 +156,10 @@ export default function Shell({ session }) {
         return <ReportingDashboard profile={profile} />;
       case 'data':
         return <DataPanel profile={profile} />;
+      case 'products':
+        return <ProductsPanel profile={profile} />;
+      case 'quote_detail':
+        return <QuoteBuilder quoteId={detailId} profile={profile} onClose={() => setView('deals')} onNavigate={navigateTo} />;
       case 'settings':
         return <SettingsPanel profile={profile} />;
       case 'account':
