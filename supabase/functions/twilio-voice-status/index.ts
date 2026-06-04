@@ -91,10 +91,18 @@ serve(async (req) => {
       }
     }
 
-    // Return TwiML for post-dial action (e.g., if nobody answered)
+    // If the dial wasn't answered, offer voicemail (recorded + transcribed).
     if (status === "no-answer" || status === "busy" || status === "failed") {
+      const FN = `${Deno.env.get("SUPABASE_URL")}/functions/v1`;
+      const ticketId = new URL(req.url).searchParams.get("ticket") || "";
       return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice">Sorry, no agents are available right now. Please try again later or send us a text message.</Say></Response>',
+        `<?xml version="1.0" encoding="UTF-8"?><Response>` +
+        `<Say voice="alice">Sorry, we couldn't reach an agent. Please leave a message after the beep and we'll get back to you.</Say>` +
+        `<Record maxLength="120" playBeep="true" transcribe="true"` +
+        ` transcribeCallback="${FN}/twilio-voicemail?mode=transcription"` +
+        ` action="${FN}/twilio-voicemail?ticket=${ticketId}" />` +
+        `<Say voice="alice">We didn't receive a message. Goodbye.</Say>` +
+        `</Response>`,
         { headers: { "Content-Type": "text/xml" } }
       );
     }

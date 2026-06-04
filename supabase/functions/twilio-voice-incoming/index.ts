@@ -199,12 +199,15 @@ serve(async (req) => {
     }
 
     // Build TwiML response
+    const FN = `${Deno.env.get("SUPABASE_URL")}/functions/v1`;
     let twiml = '<?xml version="1.0" encoding="UTF-8"?><Response>';
 
     if (onlineAgents && onlineAgents.length > 0) {
-      // Ring online agents (try first available)
+      // Ring online agents; record the call; on no-answer fall through to voicemail
       twiml += `<Say voice="alice">Please hold while we connect you to an agent.</Say>`;
-      twiml += `<Dial timeout="30" action="${Deno.env.get("SUPABASE_URL")}/functions/v1/twilio-voice-status"`;
+      twiml += `<Dial timeout="25" record="record-from-answer"`;
+      twiml += ` recordingStatusCallback="${FN}/twilio-recording" recordingStatusCallbackEvent="completed"`;
+      twiml += ` action="${FN}/twilio-voice-status?ticket=${ticketId || ""}"`;
       twiml += ` callerId="${to}">`;
 
       for (const agent of onlineAgents.slice(0, 3)) {
@@ -218,9 +221,12 @@ serve(async (req) => {
 
       twiml += `</Dial>`;
     } else {
-      // No agents online - leave a message
-      twiml += `<Say voice="alice">Thank you for calling ServOS support. All agents are currently offline. Please leave a message after the beep, or send us a text message.</Say>`;
-      twiml += `<Record maxLength="120" action="${Deno.env.get("SUPABASE_URL")}/functions/v1/twilio-voice-status" />`;
+      // No agents online - go straight to voicemail (recorded + transcribed)
+      twiml += `<Say voice="alice">Thank you for calling ServOS support. All agents are currently busy. Please leave a message after the beep and we'll get back to you.</Say>`;
+      twiml += `<Record maxLength="120" playBeep="true" transcribe="true"`;
+      twiml += ` transcribeCallback="${FN}/twilio-voicemail?mode=transcription"`;
+      twiml += ` action="${FN}/twilio-voicemail?ticket=${ticketId || ""}" />`;
+      twiml += `<Say voice="alice">We didn't receive a message. Goodbye.</Say>`;
     }
 
     twiml += '</Response>';

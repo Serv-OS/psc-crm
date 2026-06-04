@@ -285,24 +285,36 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
                   </div>
                 )}
 
-                {/* Call */}
-                {isCall && (
-                  <div className="glass-card rounded-2xl p-3 w-full">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-base">{TYPE_ICON.call}</span>
-                      <span className="text-xs font-medium text-paper">{getName(a.actor_id)}</span>
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${a.direction === 'inbound' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {a.direction === 'inbound' ? 'Inbound' : 'Outbound'} Call
-                      </span>
-                      <span className="text-[10px] text-dim ml-auto">{timeAgo(a.occurred_at)}</span>
+                {/* Call / Voicemail */}
+                {isCall && (() => {
+                  const md = a.channel_metadata || {};
+                  const isVoicemail = md.kind === 'voicemail' || md.outcome === 'voicemail';
+                  const recSid = md.recording_sid;
+                  const recUrl = recSid ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-recording?sid=${recSid}` : null;
+                  const dur = md.recording_duration || md.duration_seconds;
+                  return (
+                    <div className={`rounded-2xl p-3 w-full ${isVoicemail ? 'bg-amber-50 border border-amber-200' : 'glass-card'}`}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-base">{isVoicemail ? '\u{1F4FC}' : TYPE_ICON.call}</span>
+                        <span className="text-xs font-medium text-paper">{a.actor_id ? getName(a.actor_id) : (md.from_number || 'Customer')}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isVoicemail ? 'bg-amber-100 text-amber-700' : a.direction === 'inbound' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {isVoicemail ? 'Voicemail' : `${a.direction === 'inbound' ? 'Inbound' : 'Outbound'} Call`}
+                        </span>
+                        <span className="text-[10px] text-dim ml-auto">{timeAgo(a.occurred_at)}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted mt-1">
+                        {dur > 0 && <span>{Math.floor(dur / 60)}m {dur % 60}s</span>}
+                        {md.outcome && !isVoicemail && <span className="capitalize">{md.outcome.replace(/_/g, ' ')}</span>}
+                      </div>
+                      {recUrl && (
+                        <audio controls preload="none" src={recUrl} className="w-full mt-2 h-8" />
+                      )}
+                      {md.transcription
+                        ? <div className="text-sm text-paper mt-2 whitespace-pre-wrap italic">"{md.transcription}"</div>
+                        : a.body && <div className="text-sm text-paper mt-2 whitespace-pre-wrap">{a.body}</div>}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted mt-1">
-                      {a.channel_metadata?.duration_seconds > 0 && <span>{Math.floor(a.channel_metadata.duration_seconds / 60)}m {a.channel_metadata.duration_seconds % 60}s</span>}
-                      {a.channel_metadata?.outcome && <span className="capitalize">{a.channel_metadata.outcome.replace(/_/g, ' ')}</span>}
-                    </div>
-                    {a.body && <div className="text-sm text-paper mt-2 whitespace-pre-wrap">{a.body}</div>}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Email / SMS / WhatsApp */}
                 {!isNote && !isCall && (
