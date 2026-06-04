@@ -19,10 +19,31 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
   const [members, setMembers] = useState([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
+  const [ready, setReady] = useState(false);
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
   useEffect(() => { load(); }, [leadId]);
+
+  // Make sure the lead's FK-linked records show up in the Contacts/Companies/
+  // Locations boxes by mirroring them as associations (once).
+  const ensureAssociations = async (ld) => {
+    const links = [
+      { id: ld.contact_id, to_type: 'contact', label: 'primary_contact' },
+      { id: ld.company_id, to_type: 'company', label: 'primary_contact' },
+      { id: ld.location_id, to_type: 'location', label: 'affected_location' },
+    ].filter(x => x.id);
+    if (!links.length) return;
+    const { data: existing } = await supabase.from('associations')
+      .select('from_type, from_id, to_type, to_id')
+      .or(`and(from_type.eq.lead,from_id.eq.${leadId}),and(to_type.eq.lead,to_id.eq.${leadId})`);
+    const has = (toType, toId) => (existing || []).some(a =>
+      (a.from_type === 'lead' && a.from_id === leadId && a.to_type === toType && a.to_id === toId) ||
+      (a.to_type === 'lead' && a.to_id === leadId && a.from_type === toType && a.from_id === toId));
+    const toInsert = links.filter(l => !has(l.to_type, l.id))
+      .map(l => ({ from_type: 'lead', from_id: leadId, to_type: l.to_type, to_id: l.id, label: l.label }));
+    if (toInsert.length) await supabase.from('associations').insert(toInsert);
+  };
 
   const load = async () => {
     const [l, m] = await Promise.all([
@@ -31,9 +52,11 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
     ]);
     setLead(l.data);
     setMembers(m.data || []);
+    // Linked records still fetched for the header Call button
     if (l.data?.company_id) supabase.from('companies').select('id, name, phone, domain').eq('id', l.data.company_id).single().then(r => setCompany(r.data)); else setCompany(null);
     if (l.data?.location_id) supabase.from('locations').select('id, name, phone, city, venue_type').eq('id', l.data.location_id).single().then(r => setLocation(r.data)); else setLocation(null);
     if (l.data?.contact_id) supabase.from('contacts').select('id, first_name, last_name, phone, email').eq('id', l.data.contact_id).single().then(r => setContact(r.data)); else setContact(null);
+    if (l.data) { await ensureAssociations(l.data); setReady(true); }
   };
 
   const ownerName = (id) => { const m = members.find(u => u.id === id); return m ? (m.display_name || m.email.split('@')[0]) : 'Unassigned'; };
@@ -181,15 +204,6 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                 </div>
               </Card>
 
-              <Card title="Linked records">
-                <div className="space-y-2">
-                  {company && <LinkRow icon={'\u{1F3E2}'} label={company.name} sub="Company" onClick={() => onNavigate?.('company', company.id)} />}
-                  {location && <LinkRow icon={'\u{1F4CD}'} label={location.name} sub={[location.venue_type, location.city].filter(Boolean).join(' / ') || 'Location'} onClick={() => onNavigate?.('location', location.id)} />}
-                  {contact && <LinkRow icon={'\u{1F464}'} label={[contact.first_name, contact.last_name].filter(Boolean).join(' ') || contact.email} sub={contact.email || contact.phone || 'Contact'} onClick={() => onNavigate?.('contact', contact.id)} />}
-                  {!company && !location && !contact && <Empty>No linked records</Empty>}
-                </div>
-              </Card>
-
               <AttachmentsCard subjectType="lead" subjectId={leadId} profile={profile} />
             </div>
 
@@ -200,17 +214,23 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
               </Card>
             </div>
 
-            {/* RIGHT: associations */}
+            {/* RIGHT: associations (includes the lead's linked company/location/contact) */}
             <div className="col-span-4 space-y-4">
-              <Card title="Contacts">
-                <AssociationManager subjectType="lead" subjectId={leadId} targetType="contact" profile={profile} onNavigate={onNavigate} />
-              </Card>
-              <Card title="Companies">
-                <AssociationManager subjectType="lead" subjectId={leadId} targetType="company" profile={profile} onNavigate={onNavigate} />
-              </Card>
-              <Card title="Locations">
-                <AssociationManager subjectType="lead" subjectId={leadId} targetType="location" profile={profile} onNavigate={onNavigate} />
-              </Card>
+              {ready ? (
+                <>
+                  <Card title="Contacts">
+                    <AssociationManager subjectType="lead" subjectId={leadId} targetType="contact" profile={profile} onNavigate={onNavigate} />
+                  </Card>
+                  <Card title="Companies">
+                    <AssociationManager subjectType="lead" subjectId={leadId} targetType="company" profile={profile} onNavigate={onNavigate} />
+                  </Card>
+                  <Card title="Locations">
+                    <AssociationManager subjectType="lead" subjectId={leadId} targetType="location" profile={profile} onNavigate={onNavigate} />
+                  </Card>
+                </>
+              ) : (
+                <Card title="Linked records"><Empty>Loading…</Empty></Card>
+              )}
             </div>
           </div>
         )}
@@ -233,17 +253,6 @@ function Field({ label, value }) {
     <div>
       <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-0.5">{label}</div>
       <div className="text-sm text-paper break-words">{value}</div>
-    </div>
-  );
-}
-function LinkRow({ icon, label, sub, onClick }) {
-  return (
-    <div onClick={onClick} className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl bg-ember/15 border border-ember/25 flex items-center justify-center text-lg shrink-0">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-paper truncate">{label}</div>
-        <div className="text-xs text-muted">{sub}</div>
-      </div>
     </div>
   );
 }
