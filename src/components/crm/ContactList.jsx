@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import LeadBadge from './LeadBadge.jsx';
 import { primaryLead, LEAD_STAGES } from '../../lib/leadStages';
+import { ListContainer, RecordCard, CardHead, Chip, ChipRow } from './cardKit.jsx';
 
 export default function ContactList({ profile, onSelect }) {
   const [contacts, setContacts] = useState([]);
@@ -124,62 +125,26 @@ export default function ContactList({ profile, onSelect }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Mobile cards */}
-        <div className="sm:hidden divide-y divide-bdr">
-          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
-          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">{search ? 'No contacts match.' : 'No contacts yet.'}</div>}
-          {!loading && filtered.map(c => (
-            <button key={c.id} onClick={() => onSelect(c.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{[c.first_name, c.last_name].filter(Boolean).join(' ') || 'No name'}</span>
-                {leadFor(c.id) && <LeadBadge stage={leadFor(c.id).stage} />}
-              </div>
-              <div className="text-xs text-muted truncate">{c.email || c.phone || ''}</div>
-              <div className="text-[10px] text-dim truncate">{[getCompanyNames(c.id), c.job_title].filter(Boolean).join(' · ')}</div>
-            </button>
-          ))}
-        </div>
-
-        <table className="w-full hidden sm:table">
-          <thead>
-            <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
-              <th className="px-6 py-2.5 text-left">Name</th>
-              <th className="px-3 py-2.5 text-left">Lead</th>
-              <th className="px-3 py-2.5 text-left">Email</th>
-              <th className="px-3 py-2.5 text-left">Phone</th>
-              <th className="px-3 py-2.5 text-left">Company</th>
-              <th className="px-3 py-2.5 text-left">Job title</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>
-            )}
-            {!loading && filtered.map(c => (
-              <tr key={c.id}
-                onClick={() => onSelect(c.id)}
-                className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                <td className="px-6 py-3 text-sm text-paper font-medium">
-                  {[c.first_name, c.last_name].filter(Boolean).join(' ') || <span className="text-dim italic">No name</span>}
-                </td>
-                <td className="px-3 py-3">
-                  {leadFor(c.id) ? <LeadBadge stage={leadFor(c.id).stage} /> : <span className="text-dim text-xs">--</span>}
-                </td>
-                <td className="px-3 py-3 text-xs text-muted">{c.email || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted">{c.phone || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted">{getCompanyNames(c.id) || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted">{c.job_title || ''}</td>
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-dim text-sm">
-                {search ? 'No contacts match your search.' : 'No contacts yet.'}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ListContainer>
+        {loading && <div className="py-8 text-center text-dim text-sm">Loading...</div>}
+        {!loading && filtered.length === 0 && (
+          <div className="py-8 text-center text-dim text-sm">{search ? 'No contacts match your search.' : 'No contacts yet.'}</div>
+        )}
+        {!loading && filtered.map(c => {
+          const lead = leadFor(c.id);
+          const fullName = [c.first_name, c.last_name].filter(Boolean).join(' ') || 'No name';
+          return (
+            <RecordCard key={c.id} onClick={() => onSelect(c.id)}>
+              <CardHead title={fullName} subtitle={c.job_title} badge={lead && <LeadBadge stage={lead.stage} />} />
+              <ChipRow>
+                <Chip icon={'\u{1F4E7}'}>{c.email}</Chip>
+                <Chip icon={'\u{1F4F1}'}>{c.phone}</Chip>
+                <Chip tone="slate" icon={'\u{1F3E2}'}>{getCompanyNames(c.id)}</Chip>
+              </ChipRow>
+            </RecordCard>
+          );
+        })}
+      </ListContainer>
     </div>
   );
 }

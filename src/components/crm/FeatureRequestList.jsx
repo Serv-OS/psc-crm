@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { ListContainer, RecordCard, CardHead, Chip, ChipRow, MetaRow, OwnerTag } from './cardKit.jsx';
 
 const STATUS_STYLES = {
   new: 'bg-blue-100 text-blue-700 border border-blue-200',
@@ -135,45 +136,29 @@ export default function FeatureRequestList({ profile, onSelect }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
-              <th className="px-6 py-2.5 text-left">Request</th>
-              <th className="px-3 py-2.5 text-center">Priority</th>
-              <th className="px-3 py-2.5 text-left">Status</th>
-              <th className="px-3 py-2.5 text-center">Demand</th>
-              <th className="px-3 py-2.5 text-left">Companies</th>
-              <th className="px-3 py-2.5 text-left">Requested by</th>
-              <th className="px-3 py-2.5 text-left">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>}
-            {!loading && filtered.map(r => (
-              <tr key={r.id} onClick={() => onSelect(r.id)} className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                <td className="px-6 py-3">
-                  <div className="text-sm text-paper">{r.title}</div>
-                  {r.description && <div className="text-xs text-dim truncate max-w-xs">{r.description}</div>}
-                </td>
-                <td className="px-3 py-3 text-xs font-bold text-center">{r.priority}</td>
-                <td className="px-3 py-3">
-                  <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STATUS_STYLES[r.status]}`}>
-                    {STATUS_LABELS[r.status]}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-xs text-ember text-center font-bold">{demandCount(r.id) || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted truncate max-w-[120px]">{getLinkedCompanies(r.id)}</td>
-                <td className="px-3 py-3 text-xs text-muted">{contactName(r.requested_by)}</td>
-                <td className="px-3 py-3 text-xs text-dim">{new Date(r.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</td>
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">No feature requests.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ListContainer>
+        {loading && <div className="py-8 text-center text-dim text-sm">Loading...</div>}
+        {!loading && filtered.length === 0 && <div className="py-8 text-center text-dim text-sm">No feature requests.</div>}
+        {!loading && filtered.map(r => {
+          const demand = demandCount(r.id);
+          const cos = getLinkedCompanies(r.id);
+          return (
+            <RecordCard key={r.id} onClick={() => onSelect(r.id)}>
+              <CardHead title={r.title} subtitle={r.description}
+                badge={<span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${STATUS_STYLES[r.status]}`}>{STATUS_LABELS[r.status]}</span>} />
+              <ChipRow>
+                <span className="inline-flex items-center px-2 py-1 text-xs font-bold rounded-lg bg-card border border-bdr text-paper">{r.priority}</span>
+                {demand > 0 && <Chip icon={'\u{1F4C8}'}>{`${demand} requesting`}</Chip>}
+                <Chip tone="slate" icon={'\u{1F3E2}'}>{cos}</Chip>
+              </ChipRow>
+              <MetaRow>
+                {contactName(r.requested_by) && <span>Requested by {contactName(r.requested_by)}</span>}
+                <span>Created {new Date(r.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
+              </MetaRow>
+            </RecordCard>
+          );
+        })}
+      </ListContainer>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import LeadBadge from './LeadBadge.jsx';
 import { primaryLead, LEAD_STAGES } from '../../lib/leadStages';
+import { ListContainer, RecordCard, CardHead, Chip, ChipRow } from './cardKit.jsx';
 
 const STATUS_COLORS = {
   prospect: 'bg-blue-100 text-blue-700 border border-blue-200',
@@ -96,70 +97,31 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
         </select>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Mobile cards */}
-        <div className="sm:hidden divide-y divide-bdr">
-          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
-          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">No locations.</div>}
-          {!loading && filtered.map(l => (
-            <button key={l.id} onClick={() => onSelect(l.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{l.name}</span>
-                {leadFor(l.id) && <LeadBadge stage={leadFor(l.id).stage} />}
-                <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STATUS_COLORS[l.status] || 'bg-card text-dim'}`}>{l.status}</span>
-              </div>
-              <div className="text-xs text-muted truncate">{companyName(l.company_id)}</div>
-              <div className="text-[10px] text-dim">{[l.city, l.venue_type, l.covers ? `${l.covers} covers` : ''].filter(Boolean).join(' · ')}</div>
-            </button>
-          ))}
-        </div>
-
-        <table className="w-full hidden sm:table">
-          <thead>
-            <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
-              <th className="px-6 py-2.5 text-left">Location</th>
-              <th className="px-3 py-2.5 text-left">Company</th>
-              <th className="px-3 py-2.5 text-left">City</th>
-              <th className="px-3 py-2.5 text-left">Type</th>
-              <th className="px-3 py-2.5 text-center">Covers</th>
-              <th className="px-3 py-2.5 text-left">Lead</th>
-              <th className="px-3 py-2.5 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>
-            )}
-            {!loading && filtered.map(l => (
-              <tr key={l.id}
-                onClick={() => onSelect(l.id)}
-                className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                <td className="px-6 py-3 text-sm text-paper font-medium">{l.name}</td>
-                <td className="px-3 py-3 text-xs text-ember cursor-pointer hover:underline"
-                  onClick={(e) => { e.stopPropagation(); onNavigate?.('company', l.company_id); }}>
-                  {companyName(l.company_id)}
-                </td>
-                <td className="px-3 py-3 text-xs text-muted">{l.city || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted">{l.venue_type || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted text-center">{l.covers || ''}</td>
-                <td className="px-3 py-3">
-                  {leadFor(l.id) ? <LeadBadge stage={leadFor(l.id).stage} /> : <span className="text-dim text-xs">--</span>}
-                </td>
-                <td className="px-3 py-3">
-                  <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STATUS_COLORS[l.status] || 'bg-card text-dim'}`}>
-                    {l.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">
-                {search || statusFilter !== 'all' ? 'No locations match your filters.' : 'No locations yet.'}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ListContainer>
+        {loading && <div className="py-8 text-center text-dim text-sm">Loading...</div>}
+        {!loading && filtered.length === 0 && (
+          <div className="py-8 text-center text-dim text-sm">{search || statusFilter !== 'all' ? 'No locations match your filters.' : 'No locations yet.'}</div>
+        )}
+        {!loading && filtered.map(l => {
+          const lead = leadFor(l.id);
+          return (
+            <RecordCard key={l.id} onClick={() => onSelect(l.id)}>
+              <CardHead title={l.name} badge={
+                <span className="flex items-center gap-1.5">
+                  {lead && <LeadBadge stage={lead.stage} />}
+                  <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${STATUS_COLORS[l.status] || 'bg-card text-dim'}`}>{l.status}</span>
+                </span>
+              } />
+              <ChipRow>
+                <Chip tone="slate" icon={'\u{1F3E2}'}>{companyName(l.company_id)}</Chip>
+                <Chip icon={'\u{1F4CD}'}>{l.city}</Chip>
+                <Chip>{l.venue_type}</Chip>
+                <Chip>{l.covers ? `${l.covers} covers` : ''}</Chip>
+              </ChipRow>
+            </RecordCard>
+          );
+        })}
+      </ListContainer>
     </div>
   );
 }

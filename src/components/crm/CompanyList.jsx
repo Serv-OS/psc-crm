@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import LeadBadge from './LeadBadge.jsx';
 import { primaryLead, LEAD_STAGES } from '../../lib/leadStages';
+import { ListContainer, RecordCard, CardHead, Chip, ChipRow, MetaRow, OwnerTag } from './cardKit.jsx';
 
 export default function CompanyList({ profile, onSelect }) {
   const [companies, setCompanies] = useState([]);
@@ -128,69 +129,28 @@ export default function CompanyList({ profile, onSelect }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Mobile cards */}
-        <div className="sm:hidden divide-y divide-bdr">
-          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
-          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">{search ? 'No companies match.' : 'No companies yet.'}</div>}
-          {!loading && filtered.map(c => (
-            <button key={c.id} onClick={() => onSelect(c.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{c.name}</span>
-                {leadFor(c.id) && <LeadBadge stage={leadFor(c.id).stage} />}
-              </div>
-              <div className="text-xs text-muted truncate">{[c.domain, c.city].filter(Boolean).join(' · ')}</div>
-              <div className="text-[10px] text-dim">{locCount(c.id)} location{locCount(c.id) !== 1 ? 's' : ''} · {liveCount(c.id)} live · {ownerName(c.owner_id)}</div>
-            </button>
-          ))}
-        </div>
-
-        <table className="w-full hidden sm:table">
-          <thead>
-            <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
-              <th className="px-6 py-2.5 text-left">Company</th>
-              <th className="px-3 py-2.5 text-left">Lead</th>
-              <th className="px-3 py-2.5 text-left">Domain</th>
-              <th className="px-3 py-2.5 text-left">City</th>
-              <th className="px-3 py-2.5 text-center">Locations</th>
-              <th className="px-3 py-2.5 text-center">Live</th>
-              <th className="px-3 py-2.5 text-left">Owner</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>
-            )}
-            {!loading && filtered.map(c => (
-              <tr key={c.id}
-                onClick={() => onSelect(c.id)}
-                className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                <td className="px-6 py-3">
-                  <div className="text-sm text-paper font-medium">{c.name}</div>
-                  {c.industry && <div className="text-xs text-dim">{c.industry}</div>}
-                </td>
-                <td className="px-3 py-3">
-                  {leadFor(c.id) ? <LeadBadge stage={leadFor(c.id).stage} /> : <span className="text-dim text-xs">--</span>}
-                </td>
-                <td className="px-3 py-3 text-xs text-muted">{c.domain || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted">{c.city || ''}</td>
-                <td className="px-3 py-3 text-xs text-muted text-center">{locCount(c.id)}</td>
-                <td className="px-3 py-3 text-xs text-center">
-                  {liveCount(c.id) > 0
-                    ? <span className="text-emerald-600">{liveCount(c.id)}</span>
-                    : <span className="text-dim">0</span>}
-                </td>
-                <td className="px-3 py-3 text-xs text-muted">{ownerName(c.owner_id)}</td>
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-dim text-sm">
-                {search ? 'No companies match your search.' : 'No companies yet. Add one to get started.'}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ListContainer>
+        {loading && <div className="py-8 text-center text-dim text-sm">Loading...</div>}
+        {!loading && filtered.length === 0 && (
+          <div className="py-8 text-center text-dim text-sm">{search ? 'No companies match your search.' : 'No companies yet. Add one to get started.'}</div>
+        )}
+        {!loading && filtered.map(c => {
+          const lead = leadFor(c.id);
+          return (
+            <RecordCard key={c.id} onClick={() => onSelect(c.id)}>
+              <CardHead title={c.name} subtitle={c.industry} badge={lead && <LeadBadge stage={lead.stage} />} />
+              <ChipRow>
+                <Chip icon={'\u{1F310}'}>{c.domain}</Chip>
+                <Chip icon={'\u{1F4CD}'}>{c.city}</Chip>
+              </ChipRow>
+              <MetaRow>
+                <OwnerTag name={ownerName(c.owner_id)} />
+                <span>{locCount(c.id)} location{locCount(c.id) !== 1 ? 's' : ''}{liveCount(c.id) > 0 ? ` · ${liveCount(c.id)} live` : ''}</span>
+              </MetaRow>
+            </RecordCard>
+          );
+        })}
+      </ListContainer>
     </div>
   );
 }

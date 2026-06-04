@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import SlaBadge from './SlaBadge.jsx';
+import { ListContainer, RecordCard, CardHead, Chip, ChipRow, MetaRow, OwnerTag } from './cardKit.jsx';
 
 const STAGE_STYLES = {
   new: 'bg-blue-100 text-blue-700 border border-blue-200',
@@ -178,67 +179,28 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Mobile cards */}
-        <div className="sm:hidden divide-y divide-bdr">
-          {loading && <div className="px-4 py-8 text-center text-dim text-sm">Loading...</div>}
-          {!loading && filtered.length === 0 && <div className="px-4 py-8 text-center text-dim text-sm">No tickets.</div>}
-          {!loading && filtered.map(t => (
-            <button key={t.id} onClick={() => onSelect(t.id)} className="w-full text-left px-4 py-3 active:bg-card/50">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-mono font-bold text-ember shrink-0">{t.ticket_number ? `#${t.ticket_number}` : '--'}</span>
-                <span className="text-sm text-paper font-medium flex-1 min-w-0 truncate">{t.subject}</span>
-                <span className={`text-xs font-bold ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {companyName(t.company_id) && <span className="text-xs text-muted">{companyName(t.company_id)}</span>}
-                <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STAGE_STYLES[t.stage]}`}>{STAGE_LABELS[t.stage] || t.stage}</span>
-                <SlaBadge ticket={t} />
-                <span className="text-[10px] text-dim ml-auto">{ownerName(t.owner_id)} · {new Date(t.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <table className="w-full hidden sm:table">
-          <thead>
-            <tr className="border-b border-bdr text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
-              <th className="px-6 py-2.5 text-left">Ticket</th>
-              <th className="px-3 py-2.5 text-left">Subject</th>
-              <th className="px-3 py-2.5 text-left">Company</th>
-              <th className="px-3 py-2.5 text-center">Priority</th>
-              <th className="px-3 py-2.5 text-left">Type</th>
-              <th className="px-3 py-2.5 text-left">Stage</th>
-              <th className="px-3 py-2.5 text-left">SLA</th>
-              <th className="px-3 py-2.5 text-left">Owner</th>
-              <th className="px-3 py-2.5 text-left">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={9} className="px-6 py-8 text-center text-dim text-sm">Loading...</td></tr>}
-            {!loading && filtered.map(t => (
-              <tr key={t.id} onClick={() => onSelect(t.id)} className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                <td className="px-6 py-3 text-xs font-mono font-bold text-ember">{t.ticket_number ? `#${t.ticket_number}` : '--'}</td>
-                <td className="px-3 py-3 text-sm text-paper">{t.subject}</td>
-                <td className="px-3 py-3 text-xs text-muted">{companyName(t.company_id)}</td>
-                <td className={`px-3 py-3 text-xs font-bold text-center ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</td>
-                <td className="px-3 py-3 text-xs text-muted">{t.ticket_type}</td>
-                <td className="px-3 py-3">
-                  <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${STAGE_STYLES[t.stage]}`}>
-                    {STAGE_LABELS[t.stage] || t.stage}
-                  </span>
-                </td>
-                <td className="px-3 py-3"><SlaBadge ticket={t} /></td>
-                <td className="px-3 py-3 text-xs text-muted">{ownerName(t.owner_id)}</td>
-                <td className="px-3 py-3 text-xs text-dim">{new Date(t.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</td>
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={9} className="px-6 py-8 text-center text-dim text-sm">No tickets.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ListContainer>
+        {loading && <div className="py-8 text-center text-dim text-sm">Loading...</div>}
+        {!loading && filtered.length === 0 && <div className="py-8 text-center text-dim text-sm">No tickets.</div>}
+        {!loading && filtered.map(t => (
+          <RecordCard key={t.id} onClick={() => onSelect(t.id)}>
+            <CardHead
+              title={t.subject}
+              subtitle={[t.ticket_number ? `#${t.ticket_number}` : null, t.ticket_type].filter(Boolean).join(' · ')}
+              badge={<span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${STAGE_STYLES[t.stage]}`}>{STAGE_LABELS[t.stage] || t.stage}</span>}
+            />
+            <ChipRow>
+              <Chip tone="slate" icon={'\u{1F3E2}'}>{companyName(t.company_id)}</Chip>
+              <span className={`inline-flex items-center px-2 py-1 text-xs font-bold rounded-lg bg-card border border-bdr ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</span>
+              <SlaBadge ticket={t} />
+            </ChipRow>
+            <MetaRow>
+              <OwnerTag name={ownerName(t.owner_id)} />
+              <span>Created {new Date(t.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
+            </MetaRow>
+          </RecordCard>
+        ))}
+      </ListContainer>
     </div>
   );
 }
