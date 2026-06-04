@@ -1,6 +1,19 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 
+// CEO-defined targets (see project_sales_targets memory)
+const MONTHLY_ARR_QUOTA = 48000;   // $48K new ARR per AE per month
+const COMMISSION_RATE = 0.10;      // 10% of ARR
+const GOAL_ACTIVITIES_DAY = 40;
+const GOAL_ACTIVITIES_WEEK = 200;
+const GOAL_DEMOS_SCHEDULED_WEEK = 8;
+const GOAL_DEMOS_RUN_WEEK = 8;
+const GOAL_ONSITE_WEEK = 50;
+
+function startOfMonth() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); }
+function startOfToday() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function startOfWeek() { const d = startOfToday(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return d; } // Monday
+
 export default function ReportingDashboard({ profile }) {
   const [deals, setDeals] = useState([]);
   const [onboardings, setOnboardings] = useState([]);
@@ -14,6 +27,7 @@ export default function ReportingDashboard({ profile }) {
   const [featureRequests, setFeatureRequests] = useState([]);
   const [stageHistory, setStageHistory] = useState([]);
   const [members, setMembers] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('sales');
 
@@ -34,6 +48,7 @@ export default function ReportingDashboard({ profile }) {
       supabase.from('feature_requests').select('*'),
       supabase.from('stage_history').select('*').order('changed_at', { ascending: false }).limit(500),
       supabase.from('profiles').select('id, email, display_name'),
+      supabase.from('crm_activities').select('actor_id, type, occurred_at').gte('occurred_at', startOfMonth().toISOString()),
     ]);
     setDeals(results[0].data || []);
     setOnboardings(results[1].data || []);
@@ -47,6 +62,7 @@ export default function ReportingDashboard({ profile }) {
     setFeatureRequests(results[9].data || []);
     setStageHistory(results[10].data || []);
     setMembers(results[11].data || []);
+    setActivities(results[12].data || []);
     setLoading(false);
   };
 
@@ -80,6 +96,43 @@ export default function ReportingDashboard({ profile }) {
 
     return { total: deals.length, pipeline: pipeline.length, pipelineValue, won: won.length, wonValue, lost: lost.length, winRate, byStage, byOwner };
   }, [deals]);
+
+  // Quota, commission & activity goals per AE (this month / this week)
+  const quotaMetrics = useMemo(() => {
+    const monthStart = startOfMonth().getTime();
+    const weekStart = startOfWeek().getTime();
+    const todayStart = startOfToday().getTime();
+    const dealArr = (d) => (d.saas_arr || 0) + (d.payments_arr || 0);
+
+    // AEs = members who own at least one deal
+    const aeIds = [...new Set(deals.map(d => d.owner_id).filter(Boolean))];
+    const aes = members.filter(m => aeIds.includes(m.id));
+    const list = (aes.length ? aes : members);
+
+    const rows = list.map(m => {
+      const wonThisMonth = deals.filter(d =>
+        d.owner_id === m.id && d.stage === 'closed_won' && d.closed_at && new Date(d.closed_at).getTime() >= monthStart);
+      const arrClosed = wonThisMonth.reduce((s, d) => s + dealArr(d), 0);
+      const attainment = MONTHLY_ARR_QUOTA ? arrClosed / MONTHLY_ARR_QUOTA : 0;
+      const commission = arrClosed * COMMISSION_RATE;
+
+      const myActs = activities.filter(a => a.actor_id === m.id);
+      const actsToday = myActs.filter(a => new Date(a.occurred_at).getTime() >= todayStart).length;
+      const actsWeek = myActs.filter(a => new Date(a.occurred_at).getTime() >= weekStart).length;
+      const onsiteWeek = myActs.filter(a => a.type === 'meeting' && new Date(a.occurred_at).getTime() >= weekStart).length;
+
+      const myHist = stageHistory.filter(h => h.object_type === 'deal' && h.changed_by === m.id && h.changed_at && new Date(h.changed_at).getTime() >= weekStart);
+      const demosScheduled = myHist.filter(h => h.to_stage === 'demo_booked').length;
+      const demosRun = myHist.filter(h => h.to_stage === 'demo_done').length;
+
+      return { id: m.id, name: ownerName(m.id), arrClosed, attainment, commission, wonCount: wonThisMonth.length, actsToday, actsWeek, onsiteWeek, demosScheduled, demosRun };
+    }).sort((a, b) => b.arrClosed - a.arrClosed);
+
+    const teamArr = rows.reduce((s, r) => s + r.arrClosed, 0);
+    const teamCommission = rows.reduce((s, r) => s + r.commission, 0);
+    const teamQuota = MONTHLY_ARR_QUOTA * rows.length;
+    return { rows, teamArr, teamCommission, teamQuota };
+  }, [deals, members, activities, stageHistory]);
 
   // Onboarding metrics
   const obMetrics = useMemo(() => {
@@ -132,6 +185,7 @@ export default function ReportingDashboard({ profile }) {
 
       <div className="px-6 py-2 border-b border-bdr flex gap-1 overflow-x-auto">
         {tabBtn('sales', 'Sales')}
+        {tabBtn('quota', 'Quota & Commission')}
         {tabBtn('onboarding', 'Onboarding')}
         {tabBtn('support', 'Support')}
         {tabBtn('tasks', 'Tasks')}
@@ -169,6 +223,96 @@ export default function ReportingDashboard({ profile }) {
                 deals.map(d => [d.name, companies.find(c=>c.id===d.company_id)?.name, d.stage, d.value, ownerName(d.owner_id), d.source, d.created_at]),
                 'deals-export.csv'
               )} className="px-3 py-1.5 text-xs text-muted border border-bdr rounded hover:text-paper">Export deals CSV</button>
+            </>
+          )}
+
+          {tab === 'quota' && (
+            <>
+              <div className="grid grid-cols-4 gap-3">
+                <MetricCard label="Team ARR (this month)" value={formatCurrency(quotaMetrics.teamArr)} color="text-emerald-600" />
+                <MetricCard label="Team Quota" value={formatCurrency(quotaMetrics.teamQuota)} />
+                <MetricCard label="Attainment" value={`${quotaMetrics.teamQuota ? Math.round((quotaMetrics.teamArr / quotaMetrics.teamQuota) * 100) : 0}%`} />
+                <MetricCard label="Commission (10%)" value={formatCurrency(quotaMetrics.teamCommission)} color="text-ember" />
+              </div>
+
+              <div className="glass-card rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-bdr flex items-center gap-2">
+                  <div className={label}>Per rep — Quota &amp; Commission (this month)</div>
+                  <div className="ml-auto text-[10px] text-dim">Target {formatCurrency(MONTHLY_ARR_QUOTA)} ARR / mo · 10% commission</div>
+                </div>
+                <div className="p-2">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
+                        <th className="px-3 py-2 text-left">Rep</th>
+                        <th className="px-3 py-2 text-right">Won</th>
+                        <th className="px-3 py-2 text-right">ARR closed</th>
+                        <th className="px-3 py-2 text-left">Attainment</th>
+                        <th className="px-3 py-2 text-right">Commission</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quotaMetrics.rows.map(r => (
+                        <tr key={r.id} className="border-t border-bdr">
+                          <td className="px-3 py-2 text-sm text-paper">{r.name}</td>
+                          <td className="px-3 py-2 text-xs text-muted text-right">{r.wonCount}</td>
+                          <td className="px-3 py-2 text-sm text-emerald-600 font-mono text-right">{formatCurrency(r.arrClosed)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-ink rounded-full overflow-hidden min-w-[60px]">
+                                <div className={`h-full rounded-full ${r.attainment >= 1 ? 'bg-emerald-500' : 'bg-ember'}`} style={{ width: `${Math.min(100, Math.round(r.attainment * 100))}%` }} />
+                              </div>
+                              <span className={`text-xs font-mono w-10 text-right ${r.attainment >= 1 ? 'text-emerald-600 font-bold' : 'text-muted'}`}>{Math.round(r.attainment * 100)}%</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-sm text-ember font-mono text-right">{formatCurrency(r.commission)}{r.attainment >= 1 && ' ✓'}</td>
+                        </tr>
+                      ))}
+                      {quotaMetrics.rows.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-dim text-sm">No sales reps with deals yet.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="glass-card rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-bdr flex items-center gap-2">
+                  <div className={label}>Activity goals</div>
+                  <div className="ml-auto text-[10px] text-dim">{GOAL_ACTIVITIES_DAY}/day · {GOAL_ACTIVITIES_WEEK}/wk · {GOAL_DEMOS_SCHEDULED_WEEK} demos booked · {GOAL_DEMOS_RUN_WEEK} run · {GOAL_ONSITE_WEEK} onsite</div>
+                </div>
+                <div className="p-2">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">
+                        <th className="px-3 py-2 text-left">Rep</th>
+                        <th className="px-3 py-2 text-center">Today</th>
+                        <th className="px-3 py-2 text-center">This week</th>
+                        <th className="px-3 py-2 text-center">Demos booked</th>
+                        <th className="px-3 py-2 text-center">Demos run</th>
+                        <th className="px-3 py-2 text-center">Onsite</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quotaMetrics.rows.map(r => (
+                        <tr key={r.id} className="border-t border-bdr">
+                          <td className="px-3 py-2 text-sm text-paper">{r.name}</td>
+                          <GoalCell value={r.actsToday} goal={GOAL_ACTIVITIES_DAY} />
+                          <GoalCell value={r.actsWeek} goal={GOAL_ACTIVITIES_WEEK} />
+                          <GoalCell value={r.demosScheduled} goal={GOAL_DEMOS_SCHEDULED_WEEK} />
+                          <GoalCell value={r.demosRun} goal={GOAL_DEMOS_RUN_WEEK} />
+                          <GoalCell value={r.onsiteWeek} goal={GOAL_ONSITE_WEEK} />
+                        </tr>
+                      ))}
+                      {quotaMetrics.rows.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-dim text-sm">No activity yet.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <button onClick={() => exportCSV(
+                ['Rep','Won','ARR closed','Quota','Attainment %','Commission','Activities (wk)','Demos booked (wk)','Demos run (wk)','Onsite (wk)'],
+                quotaMetrics.rows.map(r => [r.name, r.wonCount, r.arrClosed, MONTHLY_ARR_QUOTA, Math.round(r.attainment*100), Math.round(r.commission), r.actsWeek, r.demosScheduled, r.demosRun, r.onsiteWeek]),
+                'quota-commission.csv'
+              )} className="px-3 py-1.5 text-xs text-muted border border-bdr rounded hover:text-paper">Export quota CSV</button>
             </>
           )}
 
@@ -301,6 +445,17 @@ export default function ReportingDashboard({ profile }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function GoalCell({ value, goal }) {
+  const met = value >= goal;
+  return (
+    <td className="px-3 py-2 text-center">
+      <span className={`text-xs font-mono ${met ? 'text-emerald-600 font-bold' : value > 0 ? 'text-paper' : 'text-dim'}`}>
+        {value}<span className="text-dim">/{goal}</span>
+      </span>
+    </td>
   );
 }
 
