@@ -5,6 +5,7 @@ import {
   Home, Building2, MapPin, User, Target, Banknote, Box, Rocket, Folder, CheckSquare,
   Ticket, ClipboardList, FileText, LayoutGrid, Sparkles, Flag, BarChart3,
   Bug, Star, List, Layout, Layers, Package, ChevronRight, Plus,
+  Settings as SettingsIcon, Users as UsersIcon,
 } from 'lucide-react';
 
 // Collapsible groups (App Build is dynamic; My Work + My Account are pinned)
@@ -140,6 +141,10 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
           </div>
         </div>
         <NavItem icon={User} label="My Account" active={activeKey === 'account'} onClick={() => setView('account')} />
+        <NavItem icon={SettingsIcon} label="Settings" active={activeKey === 'settings'} onClick={() => setView('settings')} />
+        {profile.role === 'owner' && (
+          <NavItem icon={UsersIcon} label="Users" active={activeKey === 'users'} onClick={() => setView('users')} />
+        )}
         <button onClick={onSignOut} className="w-full mt-1 px-3 py-1.5 text-xs btn-ghost rounded-xl">Sign out</button>
       </div>
     </aside>
