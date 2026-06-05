@@ -141,7 +141,7 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
+        <div className="px-6 py-3 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="space-y-2">
             <input className={input} value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ticket subject" autoFocus />
             <textarea className={input + ' resize-none'} rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" />

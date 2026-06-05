@@ -129,7 +129,7 @@ export default function ContactList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-4 border-b border-bdr">
+        <div className="px-6 py-4 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="space-y-3 max-w-3xl">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className={label}>First name</label><input className={input} value={nc.first_name} onChange={e => set('first_name', e.target.value)} autoFocus /></div>

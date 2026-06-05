@@ -84,7 +84,7 @@ export default function FormsList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-4 border-b border-bdr">
+        <div className="px-6 py-4 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block">Form name</label>

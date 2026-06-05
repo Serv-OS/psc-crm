@@ -140,7 +140,7 @@ export default function ProjectList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
+        <div className="px-6 py-3 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="space-y-2">
             <input className={input} value={name} onChange={e => setName(e.target.value)}
               placeholder="Project name" autoFocus />

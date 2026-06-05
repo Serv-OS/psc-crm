@@ -304,7 +304,7 @@ export default function TaskList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
+        <div className="px-6 py-3 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="space-y-2">
             <div className="flex gap-2">
               <input className={input + ' flex-1'} value={title} onChange={e => setTitle(e.target.value)}

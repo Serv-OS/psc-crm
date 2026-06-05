@@ -183,7 +183,7 @@ export default function DealBoard({ profile, onSelectDeal, onNavigate }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
+        <div className="px-6 py-3 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="flex flex-wrap gap-2 items-center">
             <input className={`${fld} flex-1 min-w-[180px]`} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Deal name" autoFocus />
             <input className={`${fld} w-32`} value={newValue} onChange={e => setNewValue(e.target.value)} placeholder="Value (GBP)" type="number" step="0.01" />

@@ -123,7 +123,7 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-4 border-b border-bdr">
+        <div className="px-6 py-4 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={createLocation} className="space-y-3 max-w-3xl">
             {(() => { const input = "w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember"; const label = "text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block"; return (
               <>

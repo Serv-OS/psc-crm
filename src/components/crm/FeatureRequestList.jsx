@@ -121,7 +121,7 @@ export default function FeatureRequestList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
+        <div className="px-6 py-3 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="space-y-2">
             <input className={input} value={title} onChange={e => setTitle(e.target.value)} placeholder="Feature request title" autoFocus />
             <div className="flex gap-2">

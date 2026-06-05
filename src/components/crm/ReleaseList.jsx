@@ -83,7 +83,7 @@ export default function ReleaseList({ profile, onSelect }) {
       </div>
 
       {showCreate && (
-        <div className="px-6 py-3 border-b border-bdr">
+        <div className="px-6 py-3 border-b border-bdr max-h-[70vh] overflow-y-auto">
           <form onSubmit={create} className="flex gap-2 items-end">
             <select className="px-2 py-2 bg-card border border-bdr rounded text-sm text-paper" value={product} onChange={e => setProduct(e.target.value)}>
               <option value="pos">POS</option><option value="crm">CRM</option>
