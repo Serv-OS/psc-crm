@@ -227,8 +227,9 @@ export default function AccountPanel({ profile, onSaved }) {
                   <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">{'\u{2713}'}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-paper">{google.email}</div>
-                    <div className="text-xs text-muted">Inbox &amp; calendar connected</div>
+                    <div className="text-xs text-muted">Inbox, calendar &amp; chat connected · Reconnect if Chat is empty</div>
                   </div>
+                  <button onClick={connectGoogle} className="px-2 py-1 text-xs text-paper border border-bdr rounded-xl hover:bg-card">Reconnect</button>
                   <button onClick={disconnectGoogle} className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-xl hover:bg-red-50">Disconnect</button>
                 </div>
               ) : (
