@@ -168,6 +168,33 @@ export default function FormBuilder({ formId, profile, onClose, onNavigate }) {
               </div>
             </Card>
 
+            {/* Look & feel */}
+            <Card title="Look &amp; feel">
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={label}>Accent colour</label>
+                    <div className="flex gap-2 items-center">
+                      <input type="color" value={form.settings?.accent || '#E8743C'} onChange={e => setSetting('accent', e.target.value)} className="w-10 h-9 rounded border border-bdr bg-card" />
+                      <input className={input + ' font-mono'} value={form.settings?.accent || '#E8743C'} onChange={e => setSetting('accent', e.target.value)} />
+                    </div>
+                    <div className="text-[10px] text-dim mt-1">Buttons, focus &amp; required marks</div>
+                  </div>
+                  <div><label className={label}>Background</label>
+                    <div className="flex gap-2 items-center">
+                      <input type="color" value={form.settings?.bg_color || '#F1F5F9'} onChange={e => setSetting('bg_color', e.target.value)} className="w-10 h-9 rounded border border-bdr bg-card" />
+                      <input className={input + ' font-mono'} value={form.settings?.bg_color || '#F1F5F9'} onChange={e => setSetting('bg_color', e.target.value)} />
+                    </div>
+                    <div className="text-[10px] text-dim mt-1">Page behind the form</div>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.settings?.show_logo !== false} onChange={e => setSetting('show_logo', e.target.checked)} />
+                  <span className="text-sm text-paper">Show our logo at the top</span>
+                </label>
+                <div><label className={label}>Button label</label><input className={input} value={form.settings?.submit_label || ''} onChange={e => setSetting('submit_label', e.target.value)} placeholder="Submit" /></div>
+              </div>
+            </Card>
+
             {/* Embed */}
             <Card title="Embed on your website">
               <div className="space-y-3">

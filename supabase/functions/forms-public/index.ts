@@ -37,7 +37,8 @@ serve(async (req) => {
 
       if (!form) return json({ error: "Form not found" }, 404);
       if (!form.enabled) return json({ error: "This form is no longer active." }, 410);
-      return json({ form });
+      const { data: s } = await supabase.from("support_settings").select("logo_url, business_name").eq("id", 1).maybeSingle();
+      return json({ form, branding: { logo_url: s?.logo_url || null, business_name: s?.business_name || null } });
     }
 
     // ---- POST: process a submission ----

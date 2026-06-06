@@ -4,6 +4,7 @@ const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/forms-public`;
 
 export default function PublicForm({ slug }) {
   const [form, setForm] = useState(null);
+  const [branding, setBranding] = useState({});
   const [values, setValues] = useState({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -18,13 +19,17 @@ export default function PublicForm({ slug }) {
         const res = await fetch(`${FN_URL}?slug=${encodeURIComponent(slug)}`);
         const d = await res.json();
         if (!res.ok) { setError(d.error || 'Form not found.'); }
-        else setForm(d.form);
+        else { setForm(d.form); setBranding(d.branding || {}); }
       } catch {
         setError('Could not load this form.');
       }
       setLoading(false);
     })();
   }, [slug]);
+
+  const accent = form?.settings?.accent || '#E8743C';
+  const bgColor = form?.settings?.bg_color || '#F1F5F9';
+  const showLogo = form?.settings?.show_logo !== false && branding?.logo_url;
 
   const setVal = (k, v) => setValues(prev => ({ ...prev, [k]: v }));
 
@@ -56,8 +61,9 @@ export default function PublicForm({ slug }) {
   };
 
   const wrap = (children) => (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 p-4">
+    <div className="min-h-screen w-full flex items-center justify-center p-4" style={{ backgroundColor: bgColor }}>
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+        {showLogo && <img src={branding.logo_url} alt={branding.business_name || ''} className="h-12 object-contain mb-5 mx-auto" />}
         {children}
       </div>
     </div>
@@ -86,7 +92,7 @@ export default function PublicForm({ slug }) {
 
       {(form.fields || []).map(f => (
         <div key={f.key}>
-          <label className={label}>{f.label}{f.required && <span className="text-orange-500"> *</span>}</label>
+          <label className={label}>{f.label}{f.required && <span style={{ color: accent }}> *</span>}</label>
           {f.type === 'textarea' ? (
             <textarea className={input + ' resize-none'} rows={4} required={f.required}
               placeholder={f.placeholder || ''} value={values[f.key] || ''}
@@ -107,8 +113,8 @@ export default function PublicForm({ slug }) {
 
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
-      <button type="submit" disabled={submitting}
-        className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+      <button type="submit" disabled={submitting} style={{ backgroundColor: accent }}
+        className="w-full py-2.5 text-white text-sm font-semibold rounded-lg transition hover:opacity-90 disabled:opacity-50">
         {submitting ? 'Sending…' : (form.settings?.submit_label || 'Submit')}
       </button>
 
