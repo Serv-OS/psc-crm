@@ -155,19 +155,32 @@ serve(async (req) => {
 
     // ---- SEND: compose / reply ----
     if (action === "send") {
-      const { to, subject, body: text, threadId, inReplyTo, references } = body;
+      const { to, subject, body: text, html, threadId, inReplyTo, references } = body;
       if (!to || !text) return json({ error: "Missing recipient or body" }, 422);
       const fromEmail = integ.email;
-      const lines = [
+      const head = [
         `From: ${fromEmail}`,
         `To: ${to}`,
         `Subject: ${subject || "(no subject)"}`,
-        "Content-Type: text/plain; charset=UTF-8",
         "MIME-Version: 1.0",
       ];
-      if (inReplyTo) lines.push(`In-Reply-To: ${inReplyTo}`);
-      if (references || inReplyTo) lines.push(`References: ${[references, inReplyTo].filter(Boolean).join(" ")}`);
-      const raw = b64urlEncode(lines.join("\r\n") + "\r\n\r\n" + text);
+      if (inReplyTo) head.push(`In-Reply-To: ${inReplyTo}`);
+      if (references || inReplyTo) head.push(`References: ${[references, inReplyTo].filter(Boolean).join(" ")}`);
+
+      let mime: string;
+      if (html) {
+        // multipart/alternative: plain-text fallback + HTML (for the logo signature)
+        const boundary = `=_servos_${Date.now()}`;
+        head.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+        mime = head.join("\r\n") + "\r\n\r\n" +
+          `--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}\r\n\r\n` +
+          `--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n\r\n` +
+          `--${boundary}--`;
+      } else {
+        head.push("Content-Type: text/plain; charset=UTF-8");
+        mime = head.join("\r\n") + "\r\n\r\n" + text;
+      }
+      const raw = b64urlEncode(mime);
       const payload: Record<string, unknown> = { raw };
       if (threadId) payload.threadId = threadId;
       const r = await fetch(`${GMAIL}/messages/send`, {

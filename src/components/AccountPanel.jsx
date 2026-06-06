@@ -26,6 +26,8 @@ export default function AccountPanel({ profile, onSaved }) {
   const [error, setError] = useState('');
   const [google, setGoogle] = useState(null);
   const [signature, setSignature] = useState('');
+  const [signatureLogo, setSignatureLogo] = useState(false);
+  const [brandingLogo, setBrandingLogo] = useState(null);
 
   useEffect(() => {
     load();
@@ -66,9 +68,12 @@ export default function AccountPanel({ profile, onSaved }) {
     setGoogle(gi.data || null);
     // Signature loaded separately so a missing column never breaks the page.
     try {
-      const { data: sig } = await supabase.from('profiles').select('email_signature').eq('id', profile.id).maybeSingle();
+      const { data: sig } = await supabase.from('profiles').select('email_signature, email_signature_logo').eq('id', profile.id).maybeSingle();
       setSignature(sig?.email_signature || '');
-    } catch { /* column may not exist yet */ }
+      setSignatureLogo(!!sig?.email_signature_logo);
+    } catch { /* columns may not exist yet */ }
+    supabase.from('support_settings').select('logo_url').eq('id', 1).maybeSingle()
+      .then(r => setBrandingLogo(r.data?.logo_url || null));
     if (p.data) {
       setForm({
         display_name: p.data.display_name || '',
@@ -115,8 +120,11 @@ export default function AccountPanel({ profile, onSaved }) {
     if (pErr) { setError('Could not save profile: ' + pErr.message); setSaving(false); return; }
 
     // Signature saved separately so a not-yet-migrated column can't block the core save.
-    const { error: sigErr } = await supabase.from('profiles').update({ email_signature: signature || null }).eq('id', profile.id);
-    if (sigErr) { setError('Profile saved, but signature could not save (run migration 029): ' + sigErr.message); setSaving(false); return; }
+    const { error: sigErr } = await supabase.from('profiles').update({
+      email_signature: signature || null,
+      email_signature_logo: signatureLogo,
+    }).eq('id', profile.id);
+    if (sigErr) { setError('Profile saved, but signature could not save (run migrations 029/030): ' + sigErr.message); setSaving(false); return; }
 
     const { error: npErr } = await supabase.from('notification_preferences').upsert({
       profile_id: profile.id,
@@ -238,11 +246,24 @@ export default function AccountPanel({ profile, onSaved }) {
               <div className="text-base font-bold text-paper">Email signature</div>
               <div className="text-xs text-muted">Added to the bottom of replies you send from the Inbox</div>
             </div>
-            <div className="p-5">
+            <div className="p-5 space-y-4">
               <textarea className={input + ' resize-none font-mono text-[13px]'} rows={5} value={signature}
                 onChange={e => setSignature(e.target.value)}
                 placeholder={`Peter Roberts\nServOS\npeter@serv-os.app · 0800 000 0000`} />
-              <div className="text-[11px] text-dim mt-2">Plain text. A separator line is added automatically before it.</div>
+              <div className="text-[11px] text-dim">A separator line is added automatically before it.</div>
+
+              <Toggle label="Include company logo" sub={brandingLogo ? 'Shown above your signature in sent emails' : 'No logo set — add one in Settings → Quote branding'}
+                checked={signatureLogo} onChange={setSignatureLogo} />
+
+              {(signature || (signatureLogo && brandingLogo)) && (
+                <div>
+                  <div className={label}>Preview</div>
+                  <div className="p-4 bg-white rounded-xl border border-bdr">
+                    {signatureLogo && brandingLogo && <img src={brandingLogo} alt="logo" className="h-10 object-contain mb-2" />}
+                    <div className="text-[13px] text-slate-700 whitespace-pre-wrap leading-snug border-t border-slate-200 pt-2">{signature || <span className="text-slate-400 italic">(your signature text)</span>}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -27,6 +27,8 @@ export default function InboxPanel({ profile, onNavigate }) {
   const { connected, connect } = useGoogleConnection(profile.id);
   const [messages, setMessages] = useState([]);
   const [signature, setSignature] = useState('');
+  const [signatureLogo, setSignatureLogo] = useState(false);
+  const [brandingLogo, setBrandingLogo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -58,8 +60,10 @@ export default function InboxPanel({ profile, onNavigate }) {
   useEffect(() => { if (connected) loadList(activeQ); }, [connected, activeQ, loadList]);
 
   useEffect(() => {
-    supabase.from('profiles').select('email_signature').eq('id', profile.id).maybeSingle()
-      .then(r => setSignature(r.data?.email_signature || '')).catch(() => {});
+    supabase.from('profiles').select('email_signature, email_signature_logo').eq('id', profile.id).maybeSingle()
+      .then(r => { setSignature(r.data?.email_signature || ''); setSignatureLogo(!!r.data?.email_signature_logo); }).catch(() => {});
+    supabase.from('support_settings').select('logo_url').eq('id', 1).maybeSingle()
+      .then(r => setBrandingLogo(r.data?.logo_url || null));
   }, [profile.id]);
 
   const openMessage = async (m) => {
@@ -156,7 +160,7 @@ export default function InboxPanel({ profile, onNavigate }) {
           ) : (
             <MessageView msg={selected} profile={profile} onNavigate={onNavigate}
               onBack={() => setSelected(null)} onArchive={() => archive(selected.id)}
-              callFn={callFn} signature={signature} />
+              callFn={callFn} signature={signature} signatureLogo={signatureLogo} brandingLogo={brandingLogo} />
           )}
         </div>
       </div>
@@ -164,7 +168,7 @@ export default function InboxPanel({ profile, onNavigate }) {
   );
 }
 
-function MessageView({ msg, profile, onNavigate, onBack, onArchive, callFn, signature }) {
+function MessageView({ msg, profile, onNavigate, onBack, onArchive, callFn, signature, signatureLogo, brandingLogo }) {
   const from = parseAddr(msg.from);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState('');
@@ -178,7 +182,7 @@ function MessageView({ msg, profile, onNavigate, onBack, onArchive, callFn, sign
   const [linking, setLinking] = useState(false);
   const [created, setCreated] = useState(null); // { type, id, label } after triage
 
-  const sigBlock = signature ? `\n\n--\n${signature}` : '';
+  const useLogo = signatureLogo && brandingLogo;
 
   useEffect(() => {
     setReplyOpen(false); setReplyBody(''); setSent(false); setErr(''); setLinkMsg(''); setCreated(null);
@@ -187,13 +191,7 @@ function MessageView({ msg, profile, onNavigate, onBack, onArchive, callFn, sign
       .then(r => setContact(r.data?.[0] || null));
   }, [msg.id]);
 
-  const openReply = () => {
-    setReplyOpen(o => {
-      const next = !o;
-      if (next && !replyBody) setReplyBody(sigBlock);
-      return next;
-    });
-  };
+  const openReply = () => setReplyOpen(o => !o);
 
   // Find a company linked to the matched contact (for ticket routing).
   const findCompanyId = async () => {
@@ -243,10 +241,24 @@ function MessageView({ msg, profile, onNavigate, onBack, onArchive, callFn, sign
     if (!replyBody.trim()) return;
     setSending(true); setErr('');
     try {
+      // Plain-text body = message + text signature. HTML body adds the logo footer.
+      const sigText = signature ? `\n\n--\n${signature}` : '';
+      const plain = replyBody + sigText;
+      let html;
+      if (useLogo || signature) {
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const nl2br = (s) => esc(s).replace(/\n/g, '<br>');
+        const sigHtml = (signature || useLogo)
+          ? `<br><br><div style="color:#6b7280">--</div>` +
+            (useLogo ? `<img src="${brandingLogo}" alt="" height="44" style="margin:6px 0;display:block">` : '') +
+            (signature ? `<div>${nl2br(signature)}</div>` : '')
+          : '';
+        html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2937;line-height:1.5">${nl2br(replyBody)}${sigHtml}</div>`;
+      }
       await callFn({
         action: 'send', to: from.email,
         subject: msg.subject?.startsWith('Re:') ? msg.subject : `Re: ${msg.subject || ''}`,
-        body: replyBody, threadId: msg.threadId,
+        body: plain, html, threadId: msg.threadId,
         inReplyTo: msg.messageId, references: msg.references,
       });
       setSent(true); setReplyOpen(false); setReplyBody('');
@@ -343,7 +355,7 @@ function MessageView({ msg, profile, onNavigate, onBack, onArchive, callFn, sign
       {/* Reply composer */}
       {replyOpen && (
         <div className="px-6 py-3 border-b border-bdr bg-card/50 shrink-0">
-          <div className="text-[11px] text-dim mb-1">Replying to {from.email}</div>
+          <div className="text-[11px] text-dim mb-1">Replying to {from.email}{(signature || useLogo) && ' · your signature will be added'}</div>
           <textarea className={input + ' resize-none'} rows={4} autoFocus value={replyBody}
             onChange={e => setReplyBody(e.target.value)} placeholder="Write your reply…" />
           {err && <div className="text-xs text-red-600 mt-1">{err}</div>}
