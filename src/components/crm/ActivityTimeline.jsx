@@ -12,8 +12,31 @@ export default function ActivityTimeline({ subjectType, subjectId, profile }) {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [direction, setDirection] = useState('outbound');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
+
+  const generateDraft = async () => {
+    setAdding(true); setAiLoading(true); setAiError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ ticket_id: subjectId }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not generate a draft.');
+      setBody(d.draft || '');
+      if (d.suggested_type) setType(d.suggested_type);
+      if (d.suggested_subject && !subject.trim()) setSubject(d.suggested_subject);
+      setDirection('outbound');
+    } catch (e) {
+      setAiError(e.message);
+    }
+    setAiLoading(false);
+  };
 
   useEffect(() => { load(); }, [subjectType, subjectId]);
 
@@ -58,10 +81,17 @@ export default function ActivityTimeline({ subjectType, subjectId, profile }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <div className={label + ' mb-0'}>Activity ({activities.length})</div>
-        {canWrite && !adding && (
-          <button onClick={() => setAdding(true)}
-            className="px-2 py-1 text-xs text-ember hover:text-ember-deep">+ Log activity</button>
-        )}
+        <div className="flex items-center gap-2">
+          {canWrite && subjectType === 'ticket' && (
+            <button onClick={generateDraft} disabled={aiLoading}
+              className="px-2 py-1 text-xs font-semibold rounded-lg bg-ember/15 text-ember-deep border border-ember/25 hover:bg-ember/25 disabled:opacity-50">
+              {aiLoading ? 'Generating…' : '✨ AI reply'}</button>
+          )}
+          {canWrite && !adding && (
+            <button onClick={() => setAdding(true)}
+              className="px-2 py-1 text-xs text-ember hover:text-ember-deep">+ Log activity</button>
+          )}
+        </div>
       </div>
 
       {adding && (
@@ -90,8 +120,17 @@ export default function ActivityTimeline({ subjectType, subjectId, profile }) {
             <input className={input} value={subject} onChange={e => setSubject(e.target.value)} placeholder="Brief summary" />
           </div>
           <div>
-            <label className={label}>Details</label>
-            <textarea className={input + ' resize-none'} rows={3} value={body} onChange={e => setBody(e.target.value)} placeholder="Notes, details..." />
+            <div className="flex items-center justify-between mb-1">
+              <label className={label + ' mb-0'}>Details</label>
+              {subjectType === 'ticket' && (
+                <button type="button" onClick={generateDraft} disabled={aiLoading}
+                  className="text-[11px] font-semibold text-ember hover:text-ember-deep disabled:opacity-50">
+                  {aiLoading ? 'Generating…' : '✨ Draft with AI'}</button>
+              )}
+            </div>
+            <textarea className={input + ' resize-none'} rows={4} value={body} onChange={e => setBody(e.target.value)} placeholder="Notes, details..." />
+            {aiError && <div className="text-[11px] text-red-600 mt-1">{aiError}</div>}
+            {body && subjectType === 'ticket' && <div className="text-[10px] text-dim mt-1">AI draft — review &amp; edit before saving.</div>}
           </div>
           <div className="flex gap-2">
             <button type="submit" className="px-3 py-1.5 bg-ember text-ink text-xs font-semibold rounded hover:bg-ember-deep">Save</button>

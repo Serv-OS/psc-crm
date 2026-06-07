@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { TEAM_OPTIONS, TEAM_LABELS } from '../UsersPanel.jsx';
+import AiSettingsCard from './AiSettingsCard.jsx';
 
 const GMAIL_CLIENT_ID = '836252293153-ekl6o41r2kra549aqnjr9bvpiq2t4nfg.apps.googleusercontent.com';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -176,6 +177,9 @@ export default function SettingsPanel({ profile }) {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl space-y-6">
+
+          {/* AI Assistant (Claude) */}
+          <AiSettingsCard profile={profile} />
 
           {/* Payments (Stripe) */}
           <div className="glass-card rounded-2xl overflow-hidden">
