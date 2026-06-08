@@ -39,7 +39,7 @@ serve(async (req) => {
     // and "To" is the phone number they want to call
     if (from?.startsWith("client:") || direction === "outbound") {
       const dialTo = to || formData.get("To") as string;
-      const callerId = Deno.env.get("TWILIO_FROM_NUMBER") || "+447576562085";
+      const callerId = Deno.env.get("TWILIO_FROM_NUMBER") || "";
 
       console.log(`Outbound call to ${dialTo} from ${callerId}`);
 

@@ -54,7 +54,12 @@ serve(async (req) => {
 
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-    const fromNumber = Deno.env.get("TWILIO_FROM_NUMBER") || "+447576562085";
+    const fromNumber = Deno.env.get("TWILIO_FROM_NUMBER");
+    if (!fromNumber) {
+      return new Response(JSON.stringify({ error: "TWILIO_FROM_NUMBER is not configured for this instance." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Send via Twilio REST API
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
