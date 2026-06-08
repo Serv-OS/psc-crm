@@ -31,6 +31,8 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionPos, setMentionPos] = useState(0);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
   const bodyRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -77,6 +79,33 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
   };
 
   const availableTemplates = templates.filter(t => t.channel === 'any' || t.channel === channel);
+
+  // One-click AI draft: ask Claude for a channel-appropriate reply, fill the composer.
+  const generateDraft = async () => {
+    setAiLoading(true); setAiError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ ticket_id: subjectId }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not generate a draft.');
+      setBody(d.draft || '');
+      const t = d.suggested_type;
+      if (t && ['note', 'email', 'sms', 'call'].includes(t)) {
+        setChannel(t);
+        if (t === 'email' && ticket?.customer_email) setToEmail(ticket.customer_email);
+        if (t === 'sms' && ticket?.customer_phone) setToPhone(ticket.customer_phone);
+        if (t === 'email' && d.suggested_subject && !subject.trim()) setSubject(d.suggested_subject);
+      }
+      bodyRef.current?.focus();
+    } catch (e) {
+      setAiError(e.message);
+    }
+    setAiLoading(false);
+  };
 
   const getName = (id) => {
     const m = members.find(u => u.id === id);
@@ -398,9 +427,17 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
               </button>
             ))}
 
+            {/* Right-aligned tools: AI draft + Templates */}
+            <div className="ml-auto flex items-center gap-1">
+            {subjectType === 'ticket' && channel !== 'call' && (
+              <button onClick={generateDraft} disabled={aiLoading}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-ember/15 text-ember-deep border border-ember/25 hover:bg-ember/25 disabled:opacity-50">
+                {aiLoading ? 'Generating…' : '✨ AI reply'}
+              </button>
+            )}
             {/* Templates picker */}
             {channel !== 'call' && availableTemplates.length > 0 && (
-              <div className="relative ml-auto">
+              <div className="relative">
                 <button onClick={() => setShowTemplates(v => !v)}
                   className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-xl bg-card text-muted hover:text-paper transition">
                   {'\u{1F4C4}'} Templates {'\u{25BE}'}
@@ -418,7 +455,9 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
                 )}
               </div>
             )}
+            </div>
           </div>
+          {aiError && <div className="text-[11px] text-red-600 mb-2 px-1">{aiError}</div>}
 
           {/* Email fields */}
           {channel === 'email' && (
