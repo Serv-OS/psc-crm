@@ -25,7 +25,7 @@ export default function ProcessingAccountDrawer({ account, profile, onClose, onC
   };
   useEffect(() => { loadVolumes(); }, [acc.id]);
 
-  const name = acc.label || acc.company?.name || 'Account';
+  const name = acc.label || acc.location?.name || acc.company?.name || 'Account';
 
   // rate comparison on their stated monthly volume
   const refVol = Number(acc.current_monthly_volume || 0);
@@ -65,7 +65,7 @@ export default function ProcessingAccountDrawer({ account, profile, onClose, onC
             <div className="text-xs text-muted flex items-center gap-2">
               <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${acc.status === 'live' ? 'bg-emerald-100 text-emerald-700' : acc.status === 'churned' ? 'bg-slate-200 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>{acc.status}</span>
               {acc.company?.name && <button onClick={() => onNavigate?.('company', acc.company_id)} className="hover:text-ember flex items-center gap-1"><Building2 size={12} /> {acc.company.name}</button>}
-              {acc.location?.name && <span>· {acc.location.name}</span>}
+              {acc.label && acc.location?.name && <span>· {acc.location.name}</span>}
             </div>
           </div>
           {canWrite && <button onClick={() => setEditingAcc(true)} className="btn-ghost px-3 py-1.5 rounded-xl text-xs flex items-center gap-1"><Pencil size={13} /> Edit</button>}

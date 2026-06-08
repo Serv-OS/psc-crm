@@ -49,7 +49,7 @@ export default function PaymentsPanel({ profile, onNavigate }) {
   }
   const liveCount = accounts.filter(a => a.status === 'live').length;
 
-  const accName = (a) => a.label || a.company?.name || 'Unnamed account';
+  const accName = (a) => a.label || a.location?.name || a.company?.name || 'Unnamed account';
 
   return (
     <div className="h-full flex flex-col">
@@ -107,7 +107,7 @@ export default function PaymentsPanel({ profile, onNavigate }) {
                         <tr key={a.id} onClick={() => setSelected(a)} className="border-b border-bdr/60 hover:bg-card/50 cursor-pointer">
                           <td className="px-5 py-2.5">
                             <div className="text-paper font-medium">{accName(a)}</div>
-                            {a.location?.name && <div className="text-[11px] text-dim">{a.location.name}</div>}
+                            {a.location?.name && a.company?.name && <div className="text-[11px] text-dim">{a.company.name}</div>}
                           </td>
                           <td className="px-3 py-2.5"><span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg ${STATUS_STYLE[a.status]}`}>{a.status}</span></td>
                           <td className="px-3 py-2.5 text-right tabular-nums text-muted">{a.current_rate_pct != null ? `${a.current_rate_pct}%` : '—'}</td>
