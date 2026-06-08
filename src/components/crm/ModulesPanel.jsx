@@ -156,7 +156,7 @@ export default function ModulesPanel({ profile }) {
           className="ml-auto px-2 py-1 bg-card border border-bdr rounded text-xs text-paper focus:outline-none focus:border-ember">
           <option value="all">All locations</option>
           {locations.map(l => (
-            <option key={l.id} value={l.id}>{l.name} ({companyName(l.company_id)})</option>
+            <option key={l.id} value={l.id}>{l.name}</option>
           ))}
         </select>
       </div>
@@ -181,7 +181,7 @@ export default function ModulesPanel({ profile }) {
                 <tr key={loc.id} className="border-b border-bdr hover:bg-card/30">
                   <td className="px-4 py-2.5 sticky left-0 bg-ink z-10">
                     <div className="text-sm font-medium text-paper">{loc.name}</div>
-                    <div className="text-xs text-ember">{companyName(loc.company_id)}</div>
+                    <div className="text-[11px] text-dim">{companyName(loc.company_id)}</div>
                   </td>
                   {modules.map(mod => {
                     const lm = getLocationModuleStatus(loc.id, mod.id);
