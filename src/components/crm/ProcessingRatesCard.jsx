@@ -12,11 +12,14 @@ export default function ProcessingRatesCard({ companyId, locationId, onNavigate 
 
   const load = async () => {
     let q = supabase.from('processing_accounts').select('*, location:locations(name)');
-    if (locationId) q = q.eq('location_id', locationId);
-    else if (companyId) q = q.eq('company_id', companyId);
+    if (companyId) q = q.eq('company_id', companyId);          // company owns the location
+    else if (locationId) q = q.eq('location_id', locationId);
     else { setAccounts([]); return; }
-    const { data: accs } = await q;
-    const ids = (accs || []).map(a => a.id);
+    let { data: accs } = await q;
+    accs = accs || [];
+    // On a location record: show this location's account + any company-wide one (no location set)
+    if (locationId) accs = accs.filter(a => a.location_id === locationId || a.location_id == null);
+    const ids = accs.map(a => a.id);
     let rates = [], vols = [];
     if (ids.length) {
       const [r, v] = await Promise.all([
@@ -49,8 +52,10 @@ export default function ProcessingRatesCard({ companyId, locationId, onNavigate 
           <div key={a.id} className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${a.status === 'live' ? 'bg-emerald-100 text-emerald-700' : a.status === 'churned' ? 'bg-slate-200 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>{a.status}</span>
-              {/* On a company card, show which location each account covers */}
-              {!locationId && <span className="text-xs text-muted">{a.location?.name || a.label || 'All locations'}</span>}
+              {/* Company card: which location each account covers. Location card: flag the company-wide one */}
+              {!locationId
+                ? <span className="text-xs text-muted">{a.location?.name || a.label || 'All locations'}</span>
+                : (a.location_id == null && <span className="text-xs text-muted">Company-wide</span>)}
               <span className="text-[11px] text-emerald-600 font-semibold ml-auto">{marginPct(a).toFixed(2)}% margin</span>
             </div>
 

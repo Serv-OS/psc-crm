@@ -218,7 +218,7 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
                 ) : <Empty>No modules enabled</Empty>}
               </Card>
 
-              <ProcessingRatesCard locationId={locationId} onNavigate={onNavigate} />
+              <ProcessingRatesCard locationId={locationId} companyId={location.company_id} onNavigate={onNavigate} />
             </div>
 
             {/* MIDDLE: Activity + Contacts */}
