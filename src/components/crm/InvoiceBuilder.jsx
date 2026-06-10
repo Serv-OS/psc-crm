@@ -11,6 +11,7 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [products, setProducts] = useState([]);
   const [globalTerms, setGlobalTerms] = useState('');
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -18,17 +19,19 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
   const load = useCallback(async () => {
-    const [i, li, c, l, ct, st] = await Promise.all([
+    const [i, li, c, l, ct, st, pr] = await Promise.all([
       supabase.from('invoices').select('*').eq('id', invoiceId).single(),
       supabase.from('invoice_line_items').select('*').eq('invoice_id', invoiceId).order('sort'),
       supabase.from('companies').select('id, name').order('name'),
       supabase.from('locations').select('id, name, company_id').order('name'),
       supabase.from('contacts').select('id, first_name, last_name, email').order('last_name'),
       supabase.from('support_settings').select('invoice_terms').eq('id', 1).maybeSingle(),
+      supabase.from('products').select('id, name, description, default_price, category').eq('active', true).order('name'),
     ]);
     setInv(i.data);
     setLines((li.data || []).length ? li.data : [{ _new: true, name: '', description: '', qty: 1, unit_price: 0 }]);
     setCompanies(c.data || []); setLocations(l.data || []); setContacts(ct.data || []);
+    setProducts(pr.data || []);
     setGlobalTerms(st.data?.invoice_terms || '');
   }, [invoiceId]);
   useEffect(() => { load(); }, [load]);
@@ -159,10 +162,28 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
 
           {/* Lines */}
           <div className="glass-card rounded-2xl p-5 space-y-2">
-            <div className="flex items-center">
+            <div className="flex items-center gap-3">
               <span className={label + ' !mb-0'}>Line items</span>
-              {!locked && <button onClick={() => setLines(p => [...p, { _new: true, name: '', description: '', qty: 1, unit_price: 0 }])}
-                className="ml-auto text-xs text-ember hover:text-ember-deep font-medium flex items-center gap-1"><Plus size={13} /> Add line</button>}
+              {!locked && (
+                <div className="ml-auto flex items-center gap-3">
+                  {products.length > 0 && (
+                    <select className={input + ' !w-52 !py-1.5 text-xs'} value=""
+                      onChange={e => {
+                        const p = products.find(x => x.id === e.target.value);
+                        if (p) setLines(prev => {
+                          const blank = prev.length === 1 && !(prev[0].name || '').trim();
+                          const line = { _new: true, name: p.name, description: p.description || '', qty: 1, unit_price: Number(p.default_price) || 0 };
+                          return blank ? [line] : [...prev, line];
+                        });
+                      }}>
+                      <option value="">+ Add from products…</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name} — £{Number(p.default_price).toLocaleString('en-GB')}</option>)}
+                    </select>
+                  )}
+                  <button onClick={() => setLines(p => [...p, { _new: true, name: '', description: '', qty: 1, unit_price: 0 }])}
+                    className="text-xs text-ember hover:text-ember-deep font-medium flex items-center gap-1"><Plus size={13} /> Blank line</button>
+                </div>
+              )}
             </div>
             {lines.map((l, i) => (
               <div key={l.id || `n${i}`} className="flex gap-2 items-start">

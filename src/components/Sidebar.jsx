@@ -13,8 +13,6 @@ const COLLAPSIBLE = [
   { id: 'sales', label: 'Sales', items: [
     ['companies', 'Companies', Building2], ['locations', 'Locations', MapPin], ['contacts', 'Contacts', User],
     ['leads', 'Leads', Target], ['deals', 'Deals', Banknote], ['products', 'Products', Box],
-  ] },
-  { id: 'payments', label: 'Payments', items: [
     ['processing', 'Card Processing', CreditCard], ['invoices', 'Invoices', Receipt],
   ] },
   { id: 'delivery', label: 'Delivery', items: [
@@ -46,7 +44,7 @@ const ACTIVE_MAP = {
   release_detail: 'releases', invoice_detail: 'invoices',
 };
 
-const DEFAULT_GROUPS = { appbuild: false, sales: true, payments: false, delivery: false, support: false, product: false, workforce: false, insights: false };
+const DEFAULT_GROUPS = { appbuild: false, sales: true, delivery: false, support: false, product: false, workforce: false, insights: false };
 
 export default function Sidebar({ profile, projects, activeProject, setActiveProject, view, setView, onSignOut, onRefresh, theme }) {
   const [logos, setLogos] = useState({ light: null, dark: null });

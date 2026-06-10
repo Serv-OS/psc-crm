@@ -23,6 +23,7 @@ export default function InvoicesPanel({ profile, onNavigate }) {
   const [companies, setCompanies] = useState([]);
   const [locations, setLocations] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [products, setProducts] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [editSched, setEditSched] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,15 +31,16 @@ export default function InvoicesPanel({ profile, onNavigate }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [i, r, c, l, ct] = await Promise.all([
+    const [i, r, c, l, ct, pr] = await Promise.all([
       supabase.from('invoices').select('*, company:companies(name), location:locations(name)').order('created_at', { ascending: false }),
       supabase.from('recurring_invoices').select('*, company:companies(name), location:locations(name)').order('created_at', { ascending: false }),
       supabase.from('companies').select('id, name').order('name'),
       supabase.from('locations').select('id, name, company_id').order('name'),
       supabase.from('contacts').select('id, first_name, last_name, email').order('last_name'),
+      supabase.from('products').select('id, name, description, default_price').eq('active', true).order('name'),
     ]);
     setInvoices(i.data || []); setSchedules(r.data || []); setCompanies(c.data || []);
-    setLocations(l.data || []); setContacts(ct.data || []);
+    setLocations(l.data || []); setContacts(ct.data || []); setProducts(pr.data || []);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -158,7 +160,7 @@ export default function InvoicesPanel({ profile, onNavigate }) {
       </div>
 
       {editSched && <ScheduleModal schedule={editSched} companies={companies} locations={locations} contacts={contacts}
-        profile={profile} onClose={() => setEditSched(null)} onSaved={() => { setEditSched(null); load(); }} />}
+        products={products} profile={profile} onClose={() => setEditSched(null)} onSaved={() => { setEditSched(null); load(); }} />}
     </div>
   );
 }
@@ -177,7 +179,7 @@ function Stat({ label, value, sub, tone }) {
 const input = "w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember";
 const label = "text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block";
 
-function ScheduleModal({ schedule, companies, locations, contacts, profile, onClose, onSaved }) {
+function ScheduleModal({ schedule, companies, locations, contacts, products = [], profile, onClose, onSaved }) {
   const s = schedule || {};
   const [f, setF] = useState({
     label: s.label || '', company_id: s.company_id || '', location_id: s.location_id || '', contact_id: s.contact_id || '',
@@ -254,10 +256,26 @@ function ScheduleModal({ schedule, companies, locations, contacts, profile, onCl
 
           {/* Lines */}
           <div className="glass-inner rounded-xl p-3 space-y-2">
-            <div className="flex items-center">
+            <div className="flex items-center gap-3">
               <span className={label + ' !mb-0'}>Line items</span>
-              <button onClick={() => setLines(p => [...p, { name: '', description: '', qty: 1, unit_price: 0 }])}
-                className="ml-auto text-xs text-ember hover:text-ember-deep font-medium">+ Add line</button>
+              <div className="ml-auto flex items-center gap-3">
+                {products.length > 0 && (
+                  <select className={input + ' !w-48 !py-1.5 text-xs'} value=""
+                    onChange={e => {
+                      const p = products.find(x => x.id === e.target.value);
+                      if (p) setLines(prev => {
+                        const blank = prev.length === 1 && !(prev[0].name || '').trim();
+                        const line = { name: p.name, description: p.description || '', qty: 1, unit_price: Number(p.default_price) || 0 };
+                        return blank ? [line] : [...prev, line];
+                      });
+                    }}>
+                    <option value="">+ From products…</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name} — £{Number(p.default_price).toLocaleString('en-GB')}</option>)}
+                  </select>
+                )}
+                <button onClick={() => setLines(p => [...p, { name: '', description: '', qty: 1, unit_price: 0 }])}
+                  className="text-xs text-ember hover:text-ember-deep font-medium">+ Blank line</button>
+              </div>
             </div>
             {lines.map((l, i) => (
               <div key={i} className="flex gap-2 items-start">

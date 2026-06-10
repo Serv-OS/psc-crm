@@ -25,18 +25,23 @@ export async function getGmailAccessToken(supabase: any): Promise<string> {
 const gbp = (n: number) => "£" + (Number(n) || 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: string | null) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
 
-export function invoiceEmailHtml(inv: any, seller: any, link: string): { subject: string; html: string } {
+export function invoiceEmailHtml(inv: any, seller: any, link: string, opts: { paid?: boolean } = {}): { subject: string; html: string } {
   const accent = seller.quote_accent || "#15C26A";
   const name = seller.business_name || "ServOS";
-  const subject = `Invoice INV-${inv.invoice_number} from ${name} — ${gbp(inv.total)}`;
+  const subject = opts.paid
+    ? `Receipt — Invoice INV-${inv.invoice_number} from ${name} (${gbp(inv.amount_paid ?? inv.total)} paid)`
+    : `Invoice INV-${inv.invoice_number} from ${name} — ${gbp(inv.total)}`;
+  const statusLine = opts.paid
+    ? `<div style="display:inline-block;background:#d1fae5;color:#065f46;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:1px;padding:4px 12px;border-radius:8px;margin-bottom:14px">Paid — thank you</div>`
+    : (inv.due_date ? `<div style="font-size:14px;color:#555;margin-bottom:18px">Due ${fmtDate(inv.due_date)}</div>` : `<div style="margin-bottom:18px"></div>`);
   const html = `
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a1a1a">
   ${seller.logo_url ? `<img src="${seller.logo_url}" alt="${name}" style="height:40px;margin-bottom:20px" />` : `<div style="font-size:20px;font-weight:700;margin-bottom:20px">${name}</div>`}
   <div style="border:1px solid #e5e5e5;border-radius:12px;padding:24px">
-    <div style="font-size:13px;color:#777;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Invoice INV-${inv.invoice_number}</div>
-    <div style="font-size:30px;font-weight:700;margin-bottom:4px">${gbp(inv.total)}</div>
-    ${inv.due_date ? `<div style="font-size:14px;color:#555;margin-bottom:18px">Due ${fmtDate(inv.due_date)}</div>` : `<div style="margin-bottom:18px"></div>`}
-    <a href="${link}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:10px">View &amp; pay invoice</a>
+    <div style="font-size:13px;color:#777;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${opts.paid ? "Receipt · " : ""}Invoice INV-${inv.invoice_number}</div>
+    <div style="font-size:30px;font-weight:700;margin-bottom:8px">${gbp(opts.paid ? (inv.amount_paid ?? inv.total) : inv.total)}</div>
+    ${statusLine}
+    <div><a href="${link}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:10px">${opts.paid ? "View invoice" : "View &amp; pay invoice"}</a></div>
     <div style="font-size:12px;color:#999;margin-top:16px">Or copy this link: <a href="${link}" style="color:${accent}">${link}</a></div>
   </div>
   <div style="font-size:12px;color:#999;margin-top:18px">${name}${seller.business_email ? ` · ${seller.business_email}` : ""}${seller.business_phone ? ` · ${seller.business_phone}` : ""}</div>
