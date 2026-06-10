@@ -91,9 +91,18 @@ export default function StockInView({ profile }) {
         <div className="max-w-[900px] mx-auto space-y-4">
           <div className="glass-card rounded-2xl p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div><label className={label}>Warehouse</label>
-              <select className={input} value={warehouse} onChange={e => setWarehouse(e.target.value)}>
-                {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select></div>
+              <div className="flex gap-1.5">
+                <select className={input} value={warehouse} onChange={e => setWarehouse(e.target.value)}>
+                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+                <button type="button" title="Add warehouse" onClick={async () => {
+                  const name = prompt('New warehouse / stock location name:');
+                  if (!name?.trim()) return;
+                  const { data, error: werr } = await supabase.from('inv_warehouses').insert({ name: name.trim() }).select().single();
+                  if (werr) { alert(werr.message); return; }
+                  await load(); setWarehouse(data.id);
+                }} className="px-3 rounded-xl border border-bdr text-muted hover:text-paper hover:border-ember shrink-0">+</button>
+              </div></div>
             <div><label className={label}>Supplier</label>
               <input className={input} list="inv-suppliers" value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="Supplier name" />
               <datalist id="inv-suppliers">{suppliers.map(s => <option key={s.id} value={s.name} />)}</datalist></div>

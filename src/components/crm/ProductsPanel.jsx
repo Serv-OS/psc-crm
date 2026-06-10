@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { INV_CATEGORIES } from '../../lib/inventoryOps';
 import { supabase } from '../../lib/supabase';
 
 const CATEGORIES = [
@@ -10,13 +11,14 @@ const CATEGORIES = [
 const CAT_LABEL = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]));
 const BILLING = { one_off: 'One-off', monthly: 'Monthly', annual: 'Annual', usage: 'Usage' };
 
-const blank = { name: '', description: '', sku: '', category: 'hardware', billing_type: 'one_off', default_price: '', unit: '', active: true };
+const blank = { name: '', description: '', sku: '', category: 'hardware', billing_type: 'one_off', default_price: '', unit: '', active: true, track_inventory: false, inv_category: '', default_threshold: '', supplier_id: '' };
 
 export default function ProductsPanel({ profile }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(blank);
+  const [suppliers, setSuppliers] = useState([]);
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
@@ -24,6 +26,8 @@ export default function ProductsPanel({ profile }) {
   const load = async () => {
     setLoading(true);
     const { data } = await supabase.from('products').select('*').order('category').order('name');
+    const { data: sup } = await supabase.from('inv_suppliers').select('id, name').order('name');
+    setSuppliers(sup || []);
     setProducts(data || []);
     setLoading(false);
   };
@@ -37,6 +41,9 @@ export default function ProductsPanel({ profile }) {
       name: draft.name.trim(), description: draft.description?.trim() || null, sku: draft.sku?.trim() || null,
       category: draft.category, billing_type: draft.billing_type,
       default_price: parseFloat(draft.default_price) || 0, unit: draft.unit?.trim() || null, active: draft.active,
+      track_inventory: !!draft.track_inventory, inv_category: draft.inv_category || null,
+      default_threshold: draft.default_threshold === '' || draft.default_threshold == null ? null : parseInt(draft.default_threshold),
+      supplier_id: draft.supplier_id || null,
     };
     if (editing === 'new') await supabase.from('products').insert(payload);
     else await supabase.from('products').update(payload).eq('id', editing);
@@ -77,6 +84,30 @@ export default function ProductsPanel({ profile }) {
               </div>
               <div><label className={label}>Description</label><textarea className={input + ' resize-none'} rows={2} value={draft.description || ''} onChange={e => setDraft({ ...draft, description: e.target.value })} /></div>
               <label className="flex items-center gap-2 text-sm text-paper cursor-pointer"><input type="checkbox" checked={draft.active} onChange={e => setDraft({ ...draft, active: e.target.checked })} /> Active (available on quotes)</label>
+
+              {/* Inventory settings */}
+              <div className="glass-inner rounded-xl p-3 space-y-3">
+                <label className="flex items-center gap-2 text-sm text-paper cursor-pointer">
+                  <input type="checkbox" checked={!!draft.track_inventory} onChange={e => setDraft({ ...draft, track_inventory: e.target.checked })} className="accent-ember" />
+                  Track in inventory (serial-tracked hardware)
+                </label>
+                {draft.track_inventory && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div><label className={label}>Hardware category</label>
+                      <select className={input} value={draft.inv_category || ''} onChange={e => setDraft({ ...draft, inv_category: e.target.value })}>
+                        <option value="">Select…</option>
+                        {INV_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select></div>
+                    <div><label className={label}>Low-stock threshold</label>
+                      <input type="number" min="0" className={input} value={draft.default_threshold ?? ''} onChange={e => setDraft({ ...draft, default_threshold: e.target.value })} placeholder="3" /></div>
+                    <div><label className={label}>Default supplier</label>
+                      <select className={input} value={draft.supplier_id || ''} onChange={e => setDraft({ ...draft, supplier_id: e.target.value })}>
+                        <option value="">None</option>
+                        {suppliers.map(su => <option key={su.id} value={su.id}>{su.name}</option>)}
+                      </select></div>
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2"><button onClick={save} className="px-4 py-2 bg-ember text-white text-sm font-semibold rounded-xl">Save</button><button onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-muted border border-bdr rounded-xl">Cancel</button></div>
             </div>
           )}
@@ -104,7 +135,7 @@ export default function ProductsPanel({ profile }) {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-sm font-mono text-paper">{money(p.default_price)}</div>
-                        <div className="text-[10px] text-dim">{BILLING[p.billing_type]}{p.unit ? ` · ${p.unit}` : ''}</div>
+                        <div className="text-[10px] text-dim">{BILLING[p.billing_type]}{p.unit ? ` · ${p.unit}` : ''}{p.track_inventory ? ' · 📦 inventory' : ''}</div>
                       </div>
                       {canWrite && (
                         <div className="flex gap-2 shrink-0">
