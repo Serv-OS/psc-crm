@@ -208,7 +208,12 @@ export default function Shell({ session }) {
       case 'inv_out':
         return <StockOutView profile={profile} onNavigate={navigateTo} />;
       case 'inv_purchasing':
-        return <PurchasingView profile={profile} />;
+      case 'inv_orders':
+        return <PurchasingView profile={profile} initialTab="orders" />;
+      case 'inv_shipments':
+        return <PurchasingView profile={profile} initialTab="transit" />;
+      case 'inv_suppliers':
+        return <PurchasingView profile={profile} initialTab="suppliers" />;
       case 'inv_stocktake':
         return <StocktakeView profile={profile} />;
       case 'inv_reports':

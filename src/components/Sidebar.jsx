@@ -5,7 +5,7 @@ import {
   Home, Building2, MapPin, User, Target, Banknote, Box, Rocket, Folder, CheckSquare,
   Ticket, ClipboardList, FileText, LayoutGrid, Sparkles, Flag, BarChart3,
   Bug, Star, List, Layout, Layers, Package, ChevronRight, Plus, Mail, Calendar, MessageSquare, Clock, Plane, CreditCard, Receipt, TrendingUp,
-  Warehouse, Boxes, PackagePlus, PackageMinus, ShoppingCart, ClipboardCheck,
+  Warehouse, Boxes, PackagePlus, PackageMinus, ShoppingCart, ClipboardCheck, Truck, Factory,
   Settings as SettingsIcon, Users as UsersIcon,
 } from 'lucide-react';
 
@@ -19,7 +19,8 @@ const COLLAPSIBLE = [
   { id: 'inventory', label: 'Inventory', items: [
     ['inv_dashboard', 'Dashboard', Warehouse], ['products', 'Products', Box], ['inv_stock', 'Stock', Boxes],
     ['inv_in', 'Stock In', PackagePlus], ['inv_out', 'Stock Out', PackageMinus],
-    ['inv_purchasing', 'Purchasing', ShoppingCart], ['inv_stocktake', 'Stocktake', ClipboardCheck],
+    ['inv_orders', 'Orders (POs)', ShoppingCart], ['inv_shipments', 'Shipments', Truck],
+    ['inv_suppliers', 'Suppliers', Factory], ['inv_stocktake', 'Stocktake', ClipboardCheck],
     ['inv_reports', 'Reports', BarChart3],
   ] },
   { id: 'delivery', label: 'Delivery', items: [
@@ -51,7 +52,7 @@ const ACTIVE_MAP = {
   release_detail: 'releases', invoice_detail: 'invoices',
 };
 
-const DEFAULT_GROUPS = { appbuild: false, sales: true, inventory: false, delivery: false, support: false, product: false, workforce: false, insights: false };
+const DEFAULT_GROUPS = { appbuild: false, sales: true, inventory: true, delivery: false, support: false, product: false, workforce: false, insights: false };
 
 export default function Sidebar({ profile, projects, activeProject, setActiveProject, view, setView, onSignOut, onRefresh, theme }) {
   const [logos, setLogos] = useState({ light: null, dark: null });
