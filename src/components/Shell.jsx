@@ -8,6 +8,11 @@ import TimePanel from './crm/TimePanel.jsx';
 import PaymentsPanel from './crm/PaymentsPanel.jsx';
 import InvoicesPanel from './crm/InvoicesPanel.jsx';
 import SalesPerformance from './crm/SalesPerformance.jsx';
+import InvDashboard from './inventory/InvDashboard.jsx';
+import StockView from './inventory/StockView.jsx';
+import StockInView from './inventory/StockInView.jsx';
+import StockOutView from './inventory/StockOutView.jsx';
+import PurchasingView from './inventory/PurchasingView.jsx';
 import InvoiceBuilder from './crm/InvoiceBuilder.jsx';
 import ScheduleView from './staffing/ScheduleView.jsx';
 import TimeOffView from './staffing/TimeOffView.jsx';
@@ -192,6 +197,16 @@ export default function Shell({ session }) {
         return <ReportingDashboard profile={profile} />;
       case 'sales_performance':
         return <SalesPerformance profile={profile} onNavigate={navigateTo} />;
+      case 'inv_dashboard':
+        return <InvDashboard profile={profile} onNavigate={(t, id) => t === 'view' ? setView(id) : navigateTo(t, id)} />;
+      case 'inv_stock':
+        return <StockView profile={profile} onNavigate={navigateTo} />;
+      case 'inv_in':
+        return <StockInView profile={profile} />;
+      case 'inv_out':
+        return <StockOutView profile={profile} onNavigate={navigateTo} />;
+      case 'inv_purchasing':
+        return <PurchasingView profile={profile} />;
       case 'data':
         return <DataPanel profile={profile} />;
       case 'products':
