@@ -11,9 +11,15 @@ export default function PhoneBar({ profile }) {
   const [isMuted, setIsMuted] = useState(false);
   const [dialNumber, setDialNumber] = useState('');
   const [showDialer, setShowDialer] = useState(false);
+  const [ourNumber, setOurNumber] = useState(null);
   const timerRef = useRef(null);
   const deviceRef = useRef(null);
   const pendingCallRef = useRef(null);
+
+  useEffect(() => {
+    supabase.from('support_settings').select('twilio_number').eq('id', 1).maybeSingle()
+      .then(({ data }) => setOurNumber(data?.twilio_number || null));
+  }, []);
 
   // Go online: get token and connect Twilio Device
   const goOnline = async () => {
@@ -324,7 +330,7 @@ export default function PhoneBar({ profile }) {
       )}
 
       {/* Spacer + phone number */}
-      <div className="ml-auto text-[10px] text-dim font-mono hidden md:block">+44 7576 562085</div>
+      {ourNumber && <div className="ml-auto text-[10px] text-dim font-mono hidden md:block">{ourNumber}</div>}
     </div>
   );
 }
