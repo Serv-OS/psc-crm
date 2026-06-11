@@ -9,9 +9,10 @@
 - [x] Vercel project from Serv-OS/posupcrm (env vars set; VITE_GOOGLE_CLIENT_ID still pending Google project)
 - [x] Supabase Auth: Email OTP length = 6; Site URL = https://posupcrm.vercel.app
 - [ ] Google Cloud project (consent Internal, scopes gmail.modify/send + calendar.events + chat.*, Chat app config, OAuth client w/ redirect to xvtzxlyjasdmwxqchwmm gmail-oauth-callback)
-- [ ] Edge function secrets: GMAIL_CLIENT_ID/SECRET (APP_URL done); TWILIO_* + own number (must be unique per instance — do NOT reuse the dev number)
+- [ ] Edge function secrets: GMAIL_CLIENT_ID/SECRET (APP_URL done)
+- [x] Twilio: number +44 7428 700815 bought 11 Jun 2026 (same account as dev, own number); webhooks → posupcrm functions; TwiML app "POSUP CRM" AP7f89a86033f1efbcca75791e262e79b2; all 6 TWILIO_* secrets set; SMS verified end-to-end both directions (posupcrm ticket #1)
 - [x] First owner login peter@posup.co.uk → profiles.role = 'owner'
-- [ ] In-app: Branding, AI key, Stripe key, quote/invoice terms, Twilio number in Settings
+- [ ] In-app: Branding, AI key, Stripe key, quote/invoice terms (Twilio number saved in Settings)
 
 DB passwords: generated at creation, stored temporarily in /tmp on Peter's Mac
 (posupcrm_dbpass.txt) — move to a password manager.
