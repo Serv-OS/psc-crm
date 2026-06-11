@@ -5,6 +5,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ensureInvoiceForQuote, quoteContactEmail } from "../_shared/quoteInvoice.ts";
+import { invoiceEmailHtml, sendInvoiceEmail } from "../_shared/invoiceEmail.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -80,6 +82,27 @@ serve(async (req) => {
     // Signing closes the deal (won + onboarding) right away. Payment, if any,
     // is still collected after — execute_quote is idempotent.
     await supabase.rpc("execute_quote", { p_quote_id: quote.id });
+
+    // Signing also raises the invoice for the one-off charges. For pay-now /
+    // deposit quotes the Stripe webhook marks this same invoice paid; for
+    // invoice-later quotes we email it to the customer immediately.
+    try {
+      const inv = await ensureInvoiceForQuote(supabase, quote);
+      if (inv && quote.payment_terms === "invoice_later") {
+        const recipient = await quoteContactEmail(supabase, quote);
+        if (recipient) {
+          const { data: seller } = await supabase.from("support_settings")
+            .select("business_name, business_email, business_phone, quote_accent, logo_url").eq("id", 1).maybeSingle();
+          const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
+          const { subject, html } = invoiceEmailHtml(inv, seller || {}, `${appUrl}/i/${inv.public_token}`, {});
+          await sendInvoiceEmail(supabase, recipient, subject, html);
+          await supabase.from("invoices").update({ sent_at: new Date().toISOString(), email_to: recipient }).eq("id", inv.id);
+        }
+      }
+    } catch (e) {
+      console.error("auto-invoice on sign failed:", (e as Error).message);
+    }
+
     if (quote.payment_terms === "invoice_later") return json({ executed: true });
     return json({ executed: true, needs_payment: true });
   } catch (e) {
