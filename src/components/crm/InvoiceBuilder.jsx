@@ -12,6 +12,7 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
   const [locations, setLocations] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [products, setProducts] = useState([]);
+  const [stockCounts, setStockCounts] = useState({});
   const [globalTerms, setGlobalTerms] = useState('');
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
@@ -19,7 +20,7 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
   const load = useCallback(async () => {
-    const [i, li, c, l, ct, st, pr] = await Promise.all([
+    const [i, li, c, l, ct, st, pr, sk] = await Promise.all([
       supabase.from('invoices').select('*').eq('id', invoiceId).single(),
       supabase.from('invoice_line_items').select('*').eq('invoice_id', invoiceId).order('sort'),
       supabase.from('companies').select('id, name').order('name'),
@@ -27,11 +28,15 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
       supabase.from('contacts').select('id, first_name, last_name, email').order('last_name'),
       supabase.from('support_settings').select('invoice_terms').eq('id', 1).maybeSingle(),
       supabase.from('products').select('id, name, description, default_price, category').eq('active', true).order('name'),
+      supabase.from('inv_serials').select('product_id').eq('status', 'in_stock'),
     ]);
     setInv(i.data);
     setLines((li.data || []).length ? li.data : [{ _new: true, name: '', description: '', qty: 1, unit_price: 0 }]);
     setCompanies(c.data || []); setLocations(l.data || []); setContacts(ct.data || []);
     setProducts(pr.data || []);
+    const counts = {};
+    (sk.data || []).forEach(r => { counts[r.product_id] = (counts[r.product_id] || 0) + 1; });
+    setStockCounts(counts);
     setGlobalTerms(st.data?.invoice_terms || '');
   }, [invoiceId]);
   useEffect(() => { load(); }, [load]);
@@ -56,7 +61,8 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
       company_id: inv.company_id || null, location_id: inv.location_id || null, contact_id: inv.contact_id || null,
       email_to: (inv.email_to || '').trim() || null, issue_date: inv.issue_date, due_date: inv.due_date || null,
       tax_rate: Number(inv.tax_rate) || 0, subtotal, tax_amount: taxAmount, total,
-      terms: (inv.terms || '').trim() || null, notes: (inv.notes || '').trim() || null, ...extra,
+      terms: (inv.terms || '').trim() || null, notes: (inv.notes || '').trim() || null,
+      po_number: (inv.po_number || '').trim() || null, ...extra,
     };
     const { error } = await supabase.from('invoices').update(patch).eq('id', invoiceId);
     if (!error) {
@@ -156,6 +162,7 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
               <select className={input} disabled={locked} value={inv.contact_id || ''} onChange={e => set('contact_id', e.target.value || null)}>
                 <option value="">—</option>{contacts.map(c => <option key={c.id} value={c.id}>{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.email}</option>)}</select></div>
             <div><label className={label}>Send to (email)</label><input className={input} disabled={locked} value={inv.email_to || ''} onChange={e => set('email_to', e.target.value)} placeholder="defaults to contact" /></div>
+            <div><label className={label}>PO number</label><input className={input} disabled={locked} value={inv.po_number || ''} onChange={e => set('po_number', e.target.value)} placeholder="Customer purchase order ref" /></div>
             <div><label className={label}>Issue date</label><input type="date" className={input} disabled={locked} value={inv.issue_date || ''} onChange={e => set('issue_date', e.target.value)} /></div>
             <div><label className={label}>Due date</label><input type="date" className={input} disabled={locked} value={inv.due_date || ''} onChange={e => set('due_date', e.target.value)} /></div>
           </div>
@@ -166,8 +173,8 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
               <span className={label + ' !mb-0'}>Line items</span>
               {!locked && (
                 <div className="ml-auto flex items-center gap-3">
-                  {products.length > 0 && (
-                    <select className={input + ' !w-52 !py-1.5 text-xs'} value=""
+                  {products.length > 0 ? (
+                    <select className={input + ' !w-60 !py-1.5 text-xs'} value=""
                       onChange={e => {
                         const p = products.find(x => x.id === e.target.value);
                         if (p) setLines(prev => {
@@ -177,8 +184,12 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
                         });
                       }}>
                       <option value="">+ Add from products…</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name} — £{Number(p.default_price).toLocaleString('en-GB')}</option>)}
+                      {products.map(p => <option key={p.id} value={p.id}>
+                        {p.name} — £{Number(p.default_price).toLocaleString('en-GB')}{stockCounts[p.id] != null ? ` (${stockCounts[p.id]} in stock)` : ''}
+                      </option>)}
                     </select>
+                  ) : (
+                    <span className="text-[11px] text-dim italic">No products in the catalogue yet — add them under Inventory → Products</span>
                   )}
                   <button onClick={() => setLines(p => [...p, { _new: true, name: '', description: '', qty: 1, unit_price: 0 }])}
                     className="text-xs text-ember hover:text-ember-deep font-medium flex items-center gap-1"><Plus size={13} /> Blank line</button>

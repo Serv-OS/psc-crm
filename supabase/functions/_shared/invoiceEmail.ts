@@ -38,7 +38,7 @@ export function invoiceEmailHtml(inv: any, seller: any, link: string, opts: { pa
 <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a1a1a">
   ${seller.logo_url ? `<img src="${seller.logo_url}" alt="${name}" style="height:40px;margin-bottom:20px" />` : `<div style="font-size:20px;font-weight:700;margin-bottom:20px">${name}</div>`}
   <div style="border:1px solid #e5e5e5;border-radius:12px;padding:24px">
-    <div style="font-size:13px;color:#777;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${opts.paid ? "Receipt · " : ""}Invoice INV-${inv.invoice_number}</div>
+    <div style="font-size:13px;color:#777;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${opts.paid ? "Receipt · " : ""}Invoice INV-${inv.invoice_number}${inv.po_number ? ` · PO ${inv.po_number}` : ""}</div>
     <div style="font-size:30px;font-weight:700;margin-bottom:8px">${gbp(opts.paid ? (inv.amount_paid ?? inv.total) : inv.total)}</div>
     ${statusLine}
     <div><a href="${link}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:10px">${opts.paid ? "View invoice" : "View &amp; pay invoice"}</a></div>

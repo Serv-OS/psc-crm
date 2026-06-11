@@ -37,6 +37,7 @@ serve(async (req) => {
     return json({
       invoice: {
         number: inv.invoice_number, status: inv.status, issue_date: inv.issue_date, due_date: inv.due_date,
+        po_number: inv.po_number || null,
         tax_rate: inv.tax_rate, subtotal: inv.subtotal, tax_amount: inv.tax_amount, total: inv.total,
         terms: inv.terms || s.invoice_terms || "", notes: inv.notes || "", paid_at: inv.paid_at,
         amount_paid: inv.amount_paid, overdue,

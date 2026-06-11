@@ -62,6 +62,7 @@ export default function PublicInvoice({ token }) {
             <div className="text-xl font-bold text-slate-900">INV-{inv.number}</div>
             <div className="text-xs text-slate-500 mt-1">Issued {fmtDate(inv.issue_date)}</div>
             {inv.due_date && <div className="text-xs text-slate-500">Due {fmtDate(inv.due_date)}</div>}
+            {inv.po_number && <div className="text-xs text-slate-500">PO {inv.po_number}</div>}
             <div className="mt-2">
               {isPaid
                 ? <Badge bg="#d1fae5" color="#065f46">Paid</Badge>
