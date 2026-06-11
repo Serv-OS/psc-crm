@@ -7,10 +7,10 @@ export function ListContainer({ children }) {
   );
 }
 
-export function RecordCard({ onClick, children }) {
+export function RecordCard({ onClick, children, highlight = false }) {
   return (
     <div onClick={onClick}
-      className="glass-card rounded-2xl p-5 cursor-pointer hover:border-ember/30 transition">
+      className={`glass-card rounded-2xl p-5 cursor-pointer hover:border-ember/30 transition ${highlight ? 'ring-2 ring-amber-400/60' : ''}`}>
       {children}
     </div>
   );

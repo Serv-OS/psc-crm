@@ -38,7 +38,16 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
-  useEffect(() => { load(); }, [subjectType, subjectId]);
+  useEffect(() => {
+    load();
+    // Live conversation: reload when any message lands on this record
+    const ch = supabase.channel(`conv-${subjectType}-${subjectId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'crm_activities', filter: `subject_id=eq.${subjectId}` },
+        load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [subjectType, subjectId]);
 
   useEffect(() => {
     // Scroll to bottom on new activities

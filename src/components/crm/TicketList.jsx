@@ -19,6 +19,10 @@ const PRIORITY_STYLES = {
   P0: 'text-red-600', P1: 'text-orange-600', P2: 'text-blue-400', P3: 'text-slate-400',
 };
 
+export const awaitingReply = (t) =>
+  !!t.last_customer_reply_at && !['resolved', 'closed'].includes(t.stage) &&
+  (!t.last_agent_reply_at || new Date(t.last_customer_reply_at) > new Date(t.last_agent_reply_at));
+
 export default function TicketList({ profile, onSelect, onNavigate }) {
   const [tickets, setTickets] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -62,6 +66,7 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
 
   const filtered = useMemo(() => {
     let result = tickets;
+    result = [...result].sort((a, b) => Number(awaitingReply(b)) - Number(awaitingReply(a)));
     if (filter.status === 'open') result = result.filter(t => !['resolved','closed'].includes(t.stage));
     else if (filter.status !== 'all') result = result.filter(t => t.stage === filter.status);
     if (filter.search) {
@@ -183,7 +188,7 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
         {loading && <div className="py-8 text-center text-dim text-sm">Loading...</div>}
         {!loading && filtered.length === 0 && <div className="py-8 text-center text-dim text-sm">No tickets.</div>}
         {!loading && filtered.map(t => (
-          <RecordCard key={t.id} onClick={() => onSelect(t.id)}>
+          <RecordCard key={t.id} onClick={() => onSelect(t.id)} highlight={awaitingReply(t)}>
             <CardHead
               title={t.subject}
               subtitle={[t.ticket_number ? `#${t.ticket_number}` : null, t.ticket_type].filter(Boolean).join(' · ')}
@@ -192,6 +197,11 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
             <ChipRow>
               <Chip tone="slate" icon={'\u{1F3E2}'}>{companyName(t.company_id)}</Chip>
               <span className={`inline-flex items-center px-2 py-1 text-xs font-bold rounded-lg bg-card border border-bdr ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</span>
+              {awaitingReply(t) && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-700 border border-amber-200 animate-pulse">
+                  {'\u{1F4AC}'} Customer replied
+                </span>
+              )}
               <SlaBadge ticket={t} />
             </ChipRow>
             <MetaRow>
