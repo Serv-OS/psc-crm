@@ -8,6 +8,7 @@ import TimePanel from './crm/TimePanel.jsx';
 import PaymentsPanel from './crm/PaymentsPanel.jsx';
 import InvoicesPanel from './crm/InvoicesPanel.jsx';
 import QuotesPanel from './crm/QuotesPanel.jsx';
+import CallLogPanel from './crm/CallLogPanel.jsx';
 import SalesPerformance from './crm/SalesPerformance.jsx';
 import InvDashboard from './inventory/InvDashboard.jsx';
 import StockView from './inventory/StockView.jsx';
@@ -235,6 +236,8 @@ export default function Shell({ session }) {
         return <PaymentsPanel profile={profile} onNavigate={navigateTo} />;
       case 'quotes':
         return <QuotesPanel profile={profile} onNavigate={navigateTo} />;
+      case 'calls':
+        return <CallLogPanel profile={profile} onNavigate={navigateTo} />;
       case 'invoices':
         return <InvoicesPanel profile={profile} onNavigate={navigateTo} />;
       case 'invoice_detail':

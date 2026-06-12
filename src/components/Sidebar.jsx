@@ -6,7 +6,7 @@ import {
   Ticket, ClipboardList, FileText, LayoutGrid, Sparkles, Flag, BarChart3,
   Bug, Star, List, Layout, Layers, Package, ChevronRight, Plus, Mail, Calendar, MessageSquare, Clock, Plane, CreditCard, Receipt, TrendingUp,
   Warehouse, Boxes, PackagePlus, PackageMinus, ShoppingCart, ClipboardCheck, Truck, Factory,
-  Settings as SettingsIcon, Users as UsersIcon, FileSignature
+  Settings as SettingsIcon, Users as UsersIcon, FileSignature, PhoneCall
 } from 'lucide-react';
 
 // Collapsible groups (App Build is dynamic; My Work + My Account are pinned)
@@ -28,7 +28,7 @@ const COLLAPSIBLE = [
     ['onboarding', 'Onboarding', Rocket], ['projects', 'Projects', Folder], ['tasks', 'Tasks', CheckSquare],
   ] },
   { id: 'support', label: 'Support', items: [
-    ['tickets', 'Support', Ticket], ['forms', 'Forms', ClipboardList], ['templates', 'Templates', FileText],
+    ['tickets', 'Support', Ticket], ['calls', 'Call Log', PhoneCall], ['forms', 'Forms', ClipboardList], ['templates', 'Templates', FileText],
   ] },
   { id: 'product', label: 'Product', items: [
     ['modules', 'Modules', LayoutGrid], ['feature_requests', 'Feature Requests', Sparkles], ['releases', 'Releases', Flag],
