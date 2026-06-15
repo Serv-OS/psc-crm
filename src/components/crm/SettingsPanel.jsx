@@ -18,6 +18,20 @@ export default function SettingsPanel({ profile }) {
   const [stripe, setStripe] = useState(null);
   const [stripeKey, setStripeKey] = useState('');
   const [stripeBusy, setStripeBusy] = useState(false);
+  const [chatTest, setChatTest] = useState(null);
+
+  const sendChatTest = async () => {
+    setChatTest('sending');
+    try {
+      const res = await fetch(fnUrl('notify-dispatch'), {
+        method: 'POST',
+        headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test_chat: true }),
+      });
+      const d = await res.json().catch(() => ({}));
+      setChatTest(res.ok ? 'sent' : ('error: ' + (d.error || res.status)));
+    } catch (e) { setChatTest('error: ' + e.message); }
+  };
 
   const isOwner = profile.role === 'owner';
 
@@ -80,6 +94,8 @@ export default function SettingsPanel({ profile }) {
       logo_url: next.logo_url ?? null,
       logo_url_dark: next.logo_url_dark ?? null,
       twilio_number: next.twilio_number ?? null,
+      chat_webhook_url: next.chat_webhook_url ?? null,
+      chat_notify_enabled: next.chat_notify_enabled ?? false,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
   };
@@ -644,6 +660,50 @@ export default function SettingsPanel({ profile }) {
                   <div className="bg-slate-50 border border-slate-200 rounded p-2 font-mono text-[10px] break-all mt-1">
                     {import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-inbound-sms
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Google Chat notifications */}
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center text-lg">
+                {'\u{1F4AC}'}
+              </div>
+              <div className="flex-1">
+                <div className="text-base font-bold text-paper">Google Chat notifications</div>
+                <div className="text-xs text-muted">Post a copy of every alert to a team Chat space</div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" disabled={!isOwner} checked={!!settings?.chat_notify_enabled}
+                  onChange={e => { setSettings(s => ({ ...s, chat_notify_enabled: e.target.checked })); saveSettings({ chat_notify_enabled: e.target.checked }); }} />
+                <span className="text-xs font-semibold text-paper">{settings?.chat_notify_enabled ? 'On' : 'Off'}</span>
+              </label>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block">Incoming webhook URL</label>
+                <input disabled={!isOwner} className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper font-mono focus:outline-none focus:border-ember disabled:opacity-60"
+                  value={settings?.chat_webhook_url || ''}
+                  onChange={e => setSettings(s => ({ ...s, chat_webhook_url: e.target.value }))}
+                  onBlur={e => saveSettings({ chat_webhook_url: e.target.value.trim() || null })}
+                  placeholder="https://chat.googleapis.com/v1/spaces/AAAA…/messages?key=…&token=…" />
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={sendChatTest} disabled={!settings?.chat_webhook_url || chatTest === 'sending'}
+                  className="btn-glass px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50">
+                  {chatTest === 'sending' ? 'Sending…' : 'Send test message'}
+                </button>
+                {chatTest === 'sent' && <span className="text-xs text-emerald-600 font-medium">Sent — check the space ✓</span>}
+                {typeof chatTest === 'string' && chatTest.startsWith('error') && <span className="text-xs text-red-600">{chatTest}</span>}
+              </div>
+              <div className="pt-3 border-t border-bdr">
+                <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-2">Setup</div>
+                <div className="text-xs text-muted space-y-1">
+                  <div>1. In Google Chat, open (or create) the space the team should watch — e.g. <strong>CRM Alerts</strong></div>
+                  <div>2. Space name → <strong>Apps &amp; integrations</strong> → <strong>Add webhooks</strong>, name it “{settings?.business_name || 'POSUP CRM'}”, and copy the URL it gives you</div>
+                  <div>3. Paste it above, toggle on, and hit <strong>Send test message</strong></div>
                 </div>
               </div>
             </div>

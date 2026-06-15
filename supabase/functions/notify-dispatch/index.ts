@@ -35,15 +35,41 @@ function inQuietHours(start: string | null, end: string | null): boolean {
   return start < end ? (now >= start && now < end) : (now >= start || now < end);
 }
 
+// Post a notification to a Google Chat space via its incoming webhook.
+async function postToChat(webhookUrl: string, title: string, body: string, appUrl: string): Promise<void> {
+  const text = `*${title || "CRM notification"}*${body ? `\n${body}` : ""}\n<${appUrl}|Open CRM>`;
+  const res = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=UTF-8" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error(`Chat webhook HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+}
+
 serve(async (req) => {
   try {
-    const { notification_id } = await req.json();
+    const payload = await req.json().catch(() => ({}));
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
+
+    // Test path: Settings "Send test" button -> post a sample to the Chat space.
+    if (payload.test_chat) {
+      const { data: s } = await supabase.from("support_settings")
+        .select("chat_webhook_url").eq("id", 1).maybeSingle();
+      if (!s?.chat_webhook_url) return json({ error: "No Chat webhook URL saved" }, 400);
+      try {
+        await postToChat(s.chat_webhook_url, "Test notification",
+          "If you can see this, Google Chat notifications are working. \u{1F389}", appUrl);
+        return json({ ok: true, chat: "sent" });
+      } catch (e) { return json({ error: (e as Error).message }, 502); }
+    }
+
+    const notification_id = payload.notification_id;
     if (!notification_id) return json({ error: "notification_id required" }, 400);
 
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: n } = await supabase.from("notifications").select("*").eq("id", notification_id).maybeSingle();
     if (!n) return json({ error: "not found" }, 404);
-    if (n.emailed_at || n.smsed_at) return json({ skipped: "already delivered" });
+    if (n.emailed_at || n.smsed_at || n.chatted_at) return json({ skipped: "already delivered" });
 
     const { data: p } = await supabase.from("profiles")
       .select("email, phone, mobile, display_name").eq("id", n.recipient_id).maybeSingle();
@@ -57,7 +83,6 @@ serve(async (req) => {
     if (typePref && prefs && prefs[typePref] === false) return json({ skipped: "type disabled" });
     const quiet = inQuietHours(prefs?.quiet_hours_start || null, prefs?.quiet_hours_end || null);
 
-    const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
     const updates: Record<string, string> = {};
     const results: Record<string, string> = {};
 
@@ -102,6 +127,30 @@ serve(async (req) => {
       }
     } else if (smsOn && quiet) {
       results.sms = "skipped: quiet hours";
+    }
+
+    // Google Chat (team space). Instance-level, not per-user: one shared feed.
+    // A single event fans out to N recipient rows, so dedupe to one Chat post
+    // by skipping if a sibling notification (same title+link, created within
+    // 30s) already went to Chat.
+    const { data: cfg } = await supabase.from("support_settings")
+      .select("chat_webhook_url, chat_notify_enabled").eq("id", 1).maybeSingle();
+    if (cfg?.chat_notify_enabled && cfg.chat_webhook_url) {
+      const since = new Date(new Date(n.created_at).getTime() - 30000).toISOString();
+      let q = supabase.from("notifications")
+        .select("id").eq("title", n.title).not("chatted_at", "is", null)
+        .gte("created_at", since).neq("id", n.id);
+      q = n.link_id ? q.eq("link_id", n.link_id) : q.is("link_id", null);
+      const { data: sibling } = await q.limit(1);
+      if ((sibling || []).length > 0) {
+        results.chat = "skipped: already posted for this event";
+      } else {
+        try {
+          await postToChat(cfg.chat_webhook_url, n.title, n.body, appUrl);
+          updates.chatted_at = new Date().toISOString();
+          results.chat = "sent";
+        } catch (e) { results.chat = "failed: " + (e as Error).message; }
+      }
     }
 
     if (Object.keys(updates).length) await supabase.from("notifications").update(updates).eq("id", n.id);
