@@ -19,7 +19,7 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [leadFilter, setLeadFilter] = useState('all');
   const [loading, setLoading] = useState(true);
-  const blankLoc = { name: '', company_id: '', new_company: '', address: '', city: '', postcode: '', phone: '', email: '', venue_type: '', covers: '', status: 'prospect', notes: '' };
+  const blankLoc = { name: '', address: '', city: '', postcode: '', venue_type: '', status: 'prospect', notes: '' };
   const [showCreate, setShowCreate] = useState(false);
   const [nl, setNl] = useState(blankLoc);
   const setL = (k, v) => setNl(p => ({ ...p, [k]: v }));
@@ -31,19 +31,10 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
   const createLocation = async (e) => {
     e.preventDefault();
     if (!nl.name.trim()) { alert('Enter a location name.'); return; }
-    let companyId = nl.company_id;
-    if (companyId === '__new__') {
-      if (!nl.new_company.trim()) { alert('Enter the new company name.'); return; }
-      const { data: co, error: cErr } = await supabase.from('companies').insert({ name: nl.new_company.trim(), owner_id: profile.id }).select('id').single();
-      if (cErr) { alert('Could not create company: ' + cErr.message); return; }
-      companyId = co.id;
-    }
-    if (!companyId) { alert('Select or create a company for this location.'); return; }
     const { data, error } = await supabase.from('locations').insert({
-      name: nl.name.trim(), company_id: companyId,
+      name: nl.name.trim(),
       address: nl.address.trim() || null, city: nl.city.trim() || null, postcode: nl.postcode.trim() || null,
-      phone: nl.phone.trim() || null, email: nl.email.trim() || null,
-      venue_type: nl.venue_type || null, covers: nl.covers ? parseInt(nl.covers) : null,
+      venue_type: nl.venue_type || null,
       status: nl.status || 'prospect', notes: nl.notes.trim() || null, owner_id: profile.id,
     }).select('id').single();
     if (error) { alert('Could not create location: ' + error.message); return; }
@@ -137,32 +128,20 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={label}>Location name *</label><input className={input} value={nl.name} onChange={e => setL('name', e.target.value)} autoFocus /></div>
-                  <div><label className={label}>Company *</label>
-                    <select className={input} value={nl.company_id} onChange={e => setL('company_id', e.target.value)}>
-                      <option value="">Select company…</option>
-                      {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      <option value="__new__">+ Create new company…</option>
-                    </select></div>
-                  {nl.company_id === '__new__' && <div className="sm:col-span-2"><label className={label}>New company name</label><input className={input} value={nl.new_company} onChange={e => setL('new_company', e.target.value)} /></div>}
                   <div><label className={label}>Address</label><input className={input} value={nl.address} onChange={e => setL('address', e.target.value)} /></div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><label className={label}>City</label><input className={input} value={nl.city} onChange={e => setL('city', e.target.value)} /></div>
                     <div><label className={label}>Postcode</label><input className={input} value={nl.postcode} onChange={e => setL('postcode', e.target.value)} /></div>
                   </div>
-                  <div><label className={label}>Phone</label><input className={input} value={nl.phone} onChange={e => setL('phone', e.target.value)} /></div>
-                  <div><label className={label}>Email</label><input className={input} value={nl.email} onChange={e => setL('email', e.target.value)} /></div>
                   <div><label className={label}>Venue type</label>
                     <select className={input} value={nl.venue_type} onChange={e => setL('venue_type', e.target.value)}>
                       <option value="">Select…</option>
                       {['restaurant','bar','cafe','fast_casual','qsr','hotel_fb','nightclub','food_hall','catering','other'].map(v => <option key={v} value={v}>{v.replace(/_/g,' ')}</option>)}
                     </select></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><label className={label}>Covers</label><input type="number" className={input} value={nl.covers} onChange={e => setL('covers', e.target.value)} /></div>
-                    <div><label className={label}>Status</label>
-                      <select className={input} value={nl.status} onChange={e => setL('status', e.target.value)}>
-                        <option value="prospect">Prospect</option><option value="onboarding">Onboarding</option><option value="live">Live</option><option value="churned">Churned</option>
-                      </select></div>
-                  </div>
+                  <div><label className={label}>Status</label>
+                    <select className={input} value={nl.status} onChange={e => setL('status', e.target.value)}>
+                      <option value="prospect">Prospect</option><option value="onboarding">Onboarding</option><option value="live">Live</option><option value="churned">Churned</option>
+                    </select></div>
                 </div>
                 <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={2} value={nl.notes} onChange={e => setL('notes', e.target.value)} /></div>
                 <div className="flex gap-2">
@@ -212,11 +191,9 @@ export default function LocationList({ profile, onSelect, onNavigate }) {
                 </span>
               } />
               <ChipRow>
-                <Chip tone="slate" icon={'\u{1F3E2}'}>{companyName(l.company_id)}</Chip>
                 <Chip tone="slate" icon={'\u{1F464}'}>{contactNames(l.id)}</Chip>
                 <Chip icon={'\u{1F4CD}'}>{l.city}</Chip>
                 <Chip>{l.venue_type}</Chip>
-                <Chip>{l.covers ? `${l.covers} covers` : ''}</Chip>
               </ChipRow>
             </RecordCard>
           );
