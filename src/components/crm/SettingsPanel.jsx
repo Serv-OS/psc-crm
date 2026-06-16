@@ -4,64 +4,27 @@ import { TEAM_OPTIONS, TEAM_LABELS } from '../UsersPanel.jsx';
 import AiSettingsCard from './AiSettingsCard.jsx';
 import BrandingCard from './BrandingCard.jsx';
 
-import { getGoogleClientId } from '../../lib/googleClientId';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/gmail-oauth-callback`;
-const SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send';
 
 export default function SettingsPanel({ profile }) {
-  const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(null);
   const [agentCounts, setAgentCounts] = useState({});
-  const [slaPolicies, setSlaPolicies] = useState([]);
   const [stripe, setStripe] = useState(null);
   const [stripeKey, setStripeKey] = useState('');
   const [stripeBusy, setStripeBusy] = useState(false);
-  const [chatTest, setChatTest] = useState(null);
-
-  const sendChatTest = async () => {
-    setChatTest('sending');
-    try {
-      const res = await fetch(fnUrl('notify-dispatch'), {
-        method: 'POST',
-        headers: { ...(await authHeader()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ test_chat: true }),
-      });
-      const d = await res.json().catch(() => ({}));
-      setChatTest(res.ok ? 'sent' : ('error: ' + (d.error || res.status)));
-    } catch (e) { setChatTest('error: ' + e.message); }
-  };
 
   const isOwner = profile.role === 'owner';
 
-  useEffect(() => {
-    load();
-    // Listen for OAuth popup result
-    const handler = (event) => {
-      if (event.data?.type === 'gmail-oauth-result') {
-        if (event.data.success) {
-          load(); // Refresh connections
-        } else {
-          alert('Gmail connection failed: ' + event.data.detail);
-        }
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const load = async () => {
     setLoading(true);
-    const [gc, ss, profs, sla] = await Promise.all([
-      supabase.from('gmail_connections').select('*').order('created_at', { ascending: false }),
+    const [ss, profs] = await Promise.all([
       supabase.from('support_settings').select('*').eq('id', 1).maybeSingle(),
       supabase.from('profiles').select('teams'),
-      supabase.from('sla_policies').select('*').order('priority'),
     ]);
-    setConnections(gc.data || []);
     setSettings(ss.data || { auto_assign_enabled: true, assign_team: 'support', prefer_online: true });
-    setSlaPolicies(sla.data || []);
     // Count members per team for the helper text
     const counts = {};
     (profs.data || []).forEach(p => (p.teams || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
@@ -94,8 +57,6 @@ export default function SettingsPanel({ profile }) {
       logo_url: next.logo_url ?? null,
       logo_url_dark: next.logo_url_dark ?? null,
       twilio_number: next.twilio_number ?? null,
-      chat_webhook_url: next.chat_webhook_url ?? null,
-      chat_notify_enabled: next.chat_notify_enabled ?? false,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
   };
@@ -145,48 +106,6 @@ export default function SettingsPanel({ profile }) {
     setStripe({ connected: false });
   };
 
-  const saveSla = async (priority, field, value) => {
-    const v = parseInt(value);
-    if (isNaN(v) || v < 0) return;
-    setSlaPolicies(prev => prev.map(p => p.priority === priority ? { ...p, [field]: v } : p));
-    await supabase.from('sla_policies').update({ [field]: v, updated_at: new Date().toISOString() }).eq('priority', priority);
-  };
-
-  const connectGmail = async () => {
-    // Get current session token to pass as state
-    const { data: { session } } = await supabase.auth.getSession();
-    const state = session?.access_token || '';
-
-    const clientId = await getGoogleClientId();
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${encodeURIComponent(clientId)}` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&response_type=code` +
-      `&scope=${encodeURIComponent(SCOPES)}` +
-      `&access_type=offline` +
-      `&prompt=consent` +
-      `&state=${encodeURIComponent(state)}`;
-
-    // Open popup
-    const w = 500, h = 600;
-    const left = (screen.width - w) / 2;
-    const top = (screen.height - h) / 2;
-    window.open(authUrl, 'gmail-oauth', `width=${w},height=${h},left=${left},top=${top}`);
-  };
-
-  const disconnectGmail = async (id) => {
-    if (!confirm('Disconnect this Gmail account? Support email will stop working.')) return;
-    await supabase.from('gmail_connections').update({ is_active: false }).eq('id', id);
-    load();
-  };
-
-  const reactivate = async (id) => {
-    await supabase.from('gmail_connections').update({ is_active: true }).eq('id', id);
-    load();
-  };
-
-  const activeConnections = connections.filter(c => c.is_active);
-  const inactiveConnections = connections.filter(c => !c.is_active);
 
   return (
     <div className="h-full flex flex-col">
@@ -508,114 +427,6 @@ export default function SettingsPanel({ profile }) {
             </div>
           )}
 
-          {/* SLA policies */}
-          {slaPolicies.length > 0 && (
-            <div className="glass-card rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-lg">{'\u{23F1}'}</div>
-                <div className="flex-1">
-                  <div className="text-base font-bold text-paper">SLA targets</div>
-                  <div className="text-xs text-muted">First-response and resolution time goals by priority</div>
-                </div>
-              </div>
-              <div className="p-5">
-                <div className="grid grid-cols-[auto_1fr_1fr] gap-x-4 gap-y-2.5 items-center">
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">Priority</div>
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">First response</div>
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim">Resolution</div>
-                  {slaPolicies.map(p => (
-                    <FragmentRow key={p.priority} p={p} isOwner={isOwner} saveSla={saveSla} />
-                  ))}
-                </div>
-                <div className="text-[11px] text-dim mt-3 pt-3 border-t border-bdr leading-relaxed">
-                  Targets are measured from when the ticket is created (wall-clock). A ticket breaches if no reply is logged, or it isn't resolved, before its due time.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Gmail Integration */}
-          <div className="glass-card rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center">
-                <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-                  <path d="M18 0H2C0.9 0 0 0.9 0 2V14C0 15.1 0.9 16 2 16H18C19.1 16 20 15.1 20 14V2C20 0.9 19.1 0 18 0Z" fill="#EA4335"/>
-                  <path d="M18 2L10 7L2 2" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="text-base font-bold text-paper">Gmail Integration</div>
-                <div className="text-xs text-muted">Connect a Gmail account for support email</div>
-              </div>
-              {isOwner && (
-                <button onClick={connectGmail}
-                  className="btn-glass px-4 py-2 rounded-xl text-sm">
-                  {activeConnections.length > 0 ? 'Add another' : 'Connect Gmail'}
-                </button>
-              )}
-            </div>
-            <div className="p-5">
-              {loading && <div className="text-xs text-dim italic py-4 text-center">Loading...</div>}
-
-              {!loading && activeConnections.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  {activeConnections.map(c => (
-                    <div key={c.id} className="flex items-center gap-3 p-3 glass-inner rounded-xl">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">
-                        {'\u{2713}'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-paper">{c.email}</div>
-                        <div className="text-xs text-muted">
-                          Connected {new Date(c.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
-                          {c.token_expires_at && ` / Token refreshes automatically`}
-                        </div>
-                      </div>
-                      <span className="px-2 py-0.5 text-[9px] font-bold uppercase rounded bg-emerald-100 text-emerald-700 border border-emerald-200">Active</span>
-                      {isOwner && (
-                        <button onClick={() => disconnectGmail(c.id)}
-                          className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-xl hover:bg-red-50">Disconnect</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!loading && activeConnections.length === 0 && (
-                <div className="text-center py-6">
-                  <div className="text-3xl mb-2">{'\u{1F4E7}'}</div>
-                  <div className="text-sm text-paper font-medium mb-1">No Gmail account connected</div>
-                  <div className="text-xs text-muted mb-3">Connect a Gmail account to receive and send support emails from within the CRM.</div>
-                  {isOwner && (
-                    <button onClick={connectGmail}
-                      className="btn-glass px-5 py-2 rounded-xl text-sm">Connect Gmail</button>
-                  )}
-                </div>
-              )}
-
-              {!loading && inactiveConnections.length > 0 && (
-                <div className="border-t border-bdr pt-3 mt-3">
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-2">Disconnected</div>
-                  {inactiveConnections.map(c => (
-                    <div key={c.id} className="flex items-center gap-3 p-2 opacity-50">
-                      <div className="text-sm text-muted">{c.email}</div>
-                      {isOwner && (
-                        <button onClick={() => reactivate(c.id)}
-                          className="px-2 py-0.5 text-xs text-muted border border-bdr rounded hover:text-paper">Reactivate</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="text-xs text-muted mt-4 pt-3 border-t border-bdr leading-relaxed">
-                <strong>How it works:</strong> When a customer emails the connected address, a support ticket is automatically created.
-                When you reply from the Email tab in a ticket, the reply is sent from the connected Gmail account.
-                Conversations are threaded so the customer sees a normal email thread.
-              </div>
-            </div>
-          </div>
-
           {/* Twilio SMS Integration */}
           <div className="glass-card rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
@@ -665,97 +476,9 @@ export default function SettingsPanel({ profile }) {
             </div>
           </div>
 
-          {/* Google Chat notifications */}
-          <div className="glass-card rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-bdr flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center text-lg">
-                {'\u{1F4AC}'}
-              </div>
-              <div className="flex-1">
-                <div className="text-base font-bold text-paper">Google Chat notifications</div>
-                <div className="text-xs text-muted">Post a copy of every alert to a team Chat space</div>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" disabled={!isOwner} checked={!!settings?.chat_notify_enabled}
-                  onChange={e => { setSettings(s => ({ ...s, chat_notify_enabled: e.target.checked })); saveSettings({ chat_notify_enabled: e.target.checked }); }} />
-                <span className="text-xs font-semibold text-paper">{settings?.chat_notify_enabled ? 'On' : 'Off'}</span>
-              </label>
-            </div>
-            <div className="p-5 space-y-3">
-              <div>
-                <label className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block">Incoming webhook URL</label>
-                <input disabled={!isOwner} className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper font-mono focus:outline-none focus:border-ember disabled:opacity-60"
-                  value={settings?.chat_webhook_url || ''}
-                  onChange={e => setSettings(s => ({ ...s, chat_webhook_url: e.target.value }))}
-                  onBlur={e => saveSettings({ chat_webhook_url: e.target.value.trim() || null })}
-                  placeholder="https://chat.googleapis.com/v1/spaces/AAAA…/messages?key=…&token=…" />
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={sendChatTest} disabled={!settings?.chat_webhook_url || chatTest === 'sending'}
-                  className="btn-glass px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50">
-                  {chatTest === 'sending' ? 'Sending…' : 'Send test message'}
-                </button>
-                {chatTest === 'sent' && <span className="text-xs text-emerald-600 font-medium">Sent — check the space ✓</span>}
-                {typeof chatTest === 'string' && chatTest.startsWith('error') && <span className="text-xs text-red-600">{chatTest}</span>}
-              </div>
-              <div className="pt-3 border-t border-bdr">
-                <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-2">Setup</div>
-                <div className="text-xs text-muted space-y-1">
-                  <div>1. In Google Chat, open (or create) the space the team should watch — e.g. <strong>CRM Alerts</strong></div>
-                  <div>2. Space name → <strong>Apps &amp; integrations</strong> → <strong>Add webhooks</strong>, name it “{settings?.business_name || 'POSUP CRM'}”, and copy the URL it gives you</div>
-                  <div>3. Paste it above, toggle on, and hit <strong>Send test message</strong></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
   );
 }
 
-function FragmentRow({ p, isOwner, saveSla }) {
-  return (
-    <>
-      <div className="text-sm font-bold text-paper">{p.priority}</div>
-      <DurationInput minutes={p.first_response_minutes} disabled={!isOwner}
-        onSave={(m) => saveSla(p.priority, 'first_response_minutes', m)} />
-      <DurationInput minutes={p.resolution_minutes} disabled={!isOwner}
-        onSave={(m) => saveSla(p.priority, 'resolution_minutes', m)} />
-    </>
-  );
-}
-
-const UNIT_FACTOR = { minutes: 1, hours: 60, days: 1440 };
-
-// Edit a duration as a value + unit (minutes/hours/days). Saves back in minutes.
-function DurationInput({ minutes, disabled, onSave }) {
-  // Choose the cleanest unit for the stored value
-  const initUnit = minutes % 1440 === 0 && minutes >= 1440 ? 'days'
-                 : minutes % 60 === 0 && minutes >= 60 ? 'hours' : 'minutes';
-  const [unit, setUnit] = useState(initUnit);
-  const [val, setVal] = useState(String(minutes / UNIT_FACTOR[initUnit]));
-
-  const commit = (v, u) => {
-    const m = Math.round(parseFloat(v) * UNIT_FACTOR[u]);
-    if (!isNaN(m) && m > 0 && m !== minutes) onSave(m);
-  };
-
-  const cell = "w-full px-2 py-1.5 bg-card border border-bdr rounded-lg text-sm text-paper focus:outline-none focus:border-ember";
-  return (
-    <div className="flex gap-1.5">
-      <input type="number" min="1" step="any" disabled={disabled} value={val}
-        onChange={e => setVal(e.target.value)}
-        onBlur={e => commit(e.target.value, unit)}
-        className={cell + ' flex-1'} />
-      <select disabled={disabled} value={unit}
-        onChange={e => { setUnit(e.target.value); commit(val, e.target.value); }}
-        className="px-2 py-1.5 bg-card border border-bdr rounded-lg text-sm text-paper focus:outline-none focus:border-ember shrink-0">
-        <option value="minutes">min</option>
-        <option value="hours">hrs</option>
-        <option value="days">days</option>
-      </select>
-    </div>
-  );
-}
