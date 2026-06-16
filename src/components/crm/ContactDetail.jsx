@@ -123,7 +123,7 @@ export default function ContactDetail({ contactId, profile, onClose, onNavigate,
         ) : (
           <div className="grid grid-cols-12 gap-4 max-w-[1400px]">
 
-            {/* LEFT: Key Info */}
+            {/* LEFT: Key Info + Locations */}
             <div className="col-span-4 space-y-4">
               <Card title="Key Info">
                 <div className="space-y-3">
@@ -136,6 +136,10 @@ export default function ContactDetail({ contactId, profile, onClose, onNavigate,
                   {contact.notes && <Field label="Notes" value={contact.notes} />}
                 </div>
               </Card>
+
+              <Card title="Locations">
+                <AssociationManager subjectType="contact" subjectId={contactId} targetType="location" profile={profile} onNavigate={onNavigate} />
+              </Card>
             </div>
 
             {/* MIDDLE: Activity */}
@@ -145,7 +149,7 @@ export default function ContactDetail({ contactId, profile, onClose, onNavigate,
               </Card>
             </div>
 
-            {/* RIGHT: Leads + Deals + Locations */}
+            {/* RIGHT: Leads + Deals + Invoices */}
             <div className="col-span-4 space-y-4">
               <LeadsCard leads={leads} />
 
@@ -154,10 +158,6 @@ export default function ContactDetail({ contactId, profile, onClose, onNavigate,
               </Card>
 
               <InvoicesCard contactId={contactId} profile={profile} onNavigate={onNavigate} />
-
-              <Card title="Locations">
-                <AssociationManager subjectType="contact" subjectId={contactId} targetType="location" profile={profile} onNavigate={onNavigate} />
-              </Card>
             </div>
           </div>
         )}
