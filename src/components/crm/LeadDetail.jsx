@@ -234,9 +234,6 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                   <Card title="Contacts">
                     <AssociationManager subjectType="lead" subjectId={leadId} targetType="contact" profile={profile} onNavigate={onNavigate} />
                   </Card>
-                  <Card title="Companies">
-                    <AssociationManager subjectType="lead" subjectId={leadId} targetType="company" profile={profile} onNavigate={onNavigate} />
-                  </Card>
                   <Card title="Locations">
                     <AssociationManager subjectType="lead" subjectId={leadId} targetType="location" profile={profile} onNavigate={onNavigate} />
                   </Card>
