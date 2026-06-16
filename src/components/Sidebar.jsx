@@ -12,10 +12,9 @@ import {
 // Collapsible groups (App Build is dynamic; My Work + My Account are pinned)
 const COLLAPSIBLE = [
   { id: 'sales', label: 'Sales', items: [
-    ['companies', 'Companies', Building2], ['locations', 'Locations', MapPin], ['contacts', 'Contacts', User],
+    ['locations', 'Locations', MapPin], ['contacts', 'Contacts', User],
     ['leads', 'Leads', Target], ['deals', 'Deals', Banknote],
-    ['processing', 'Card Processing', CreditCard], ['quotes', 'Quotes', FileSignature],
-    ['invoices', 'Invoices', Receipt],
+    ['quotes', 'Quotes', FileSignature], ['invoices', 'Invoices', Receipt],
   ] },
   { id: 'inventory', label: 'Inventory', items: [
     ['inv_dashboard', 'Dashboard', Warehouse], ['products', 'Products', Box], ['inv_stock', 'Stock', Boxes],
@@ -29,9 +28,6 @@ const COLLAPSIBLE = [
   ] },
   { id: 'support', label: 'Support', items: [
     ['tickets', 'Support', Ticket], ['calls', 'Call Log', PhoneCall], ['forms', 'Forms', ClipboardList], ['templates', 'Templates', FileText],
-  ] },
-  { id: 'product', label: 'Product', items: [
-    ['modules', 'Modules', LayoutGrid], ['feature_requests', 'Feature Requests', Sparkles], ['releases', 'Releases', Flag],
   ] },
   { id: 'workforce', label: 'Workforce', items: [
     ['time', 'Time Tracking', Clock], ['schedule', 'Schedule', Calendar], ['timeoff', 'Time Off', Plane],
@@ -102,34 +98,11 @@ export default function Sidebar({ profile, projects, activeProject, setActivePro
       {/* Nav */}
       <div className="flex-1 overflow-y-auto px-2 py-3">
 
-        {/* App Build (dynamic projects) */}
-        <GroupHeader label="App Build" count={projects.length} open={open.appbuild}
-          onToggle={() => toggle('appbuild')}
-          onAdd={canWrite ? () => { setOpen(o => ({ ...o, appbuild: true })); setAdding(true); } : null} />
-        {open.appbuild && (
-          <div className="space-y-0.5">
-            {adding && (
-              <form onSubmit={createProject} className="px-2 py-1 flex gap-1.5">
-                <input value={projName} onChange={e => setProjName(e.target.value)} autoFocus placeholder="Project name"
-                  className="flex-1 px-2 py-1 bg-card border border-bdr rounded-lg text-sm text-paper placeholder-dim" />
-                <button type="submit" className="px-2 py-1 bg-ember text-white rounded-lg text-xs font-semibold">Add</button>
-              </form>
-            )}
-            {projects.map(p => {
-              const Icon = PROJECT_ICON[(p.name || '').toLowerCase()] || Package;
-              const active = view === 'board' && activeProject?.id === p.id;
-              return <NavItem key={p.id} icon={Icon} label={p.name} active={active}
-                onClick={() => { setActiveProject(p); setView('board'); }} />;
-            })}
-          </div>
-        )}
-
         {/* My Work (pinned) */}
-        <div className="mt-2 space-y-0.5">
+        <div className="space-y-0.5">
           <NavItem icon={Home} label="My Work" active={activeKey === 'mywork'} onClick={() => setView('mywork')} />
           <NavItem icon={Mail} label="Inbox" active={activeKey === 'inbox'} onClick={() => setView('inbox')} />
           <NavItem icon={Calendar} label="Calendar" active={activeKey === 'calendar'} onClick={() => setView('calendar')} />
-          <NavItem icon={MessageSquare} label="Chat" active={activeKey === 'chat'} onClick={() => setView('chat')} />
         </div>
 
         {/* Collapsible groups */}
