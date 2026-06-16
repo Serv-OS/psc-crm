@@ -31,7 +31,7 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
       supabase.from('inv_serials').select('product_id').eq('status', 'in_stock'),
     ]);
     setInv(i.data);
-    setLines((li.data || []).length ? li.data : [{ _new: true, name: '', description: '', qty: 1, unit_price: 0, tax_rate: 20 }]);
+    setLines((li.data || []).length ? li.data : [{ _new: true, name: '', description: '', qty: 1, unit_price: 0, tax_rate: 0 }]);
     setCompanies(c.data || []); setLocations(l.data || []); setContacts(ct.data || []);
     setProducts(pr.data || []);
     const counts = {};
@@ -154,9 +154,6 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
 
           {/* Customer + dates */}
           <div className="glass-card rounded-2xl p-5 grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div><label className={label}>Company</label>
-              <select className={input} disabled={locked} value={inv.company_id || ''} onChange={e => { set('company_id', e.target.value || null); set('location_id', null); }}>
-                <option value="">—</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             <div><label className={label}>Location</label>
               <select className={input} disabled={locked} value={inv.location_id || ''} onChange={e => set('location_id', e.target.value || null)}>
                 <option value="">—</option>{locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
@@ -181,19 +178,19 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
                         const p = products.find(x => x.id === e.target.value);
                         if (p) setLines(prev => {
                           const blank = prev.length === 1 && !(prev[0].name || '').trim();
-                          const line = { _new: true, name: p.name, description: p.description || '', qty: 1, unit_price: Number(p.default_price) || 0, tax_rate: 20 };
+                          const line = { _new: true, name: p.name, description: p.description || '', qty: 1, unit_price: Number(p.default_price) || 0, tax_rate: 0 };
                           return blank ? [line] : [...prev, line];
                         });
                       }}>
                       <option value="">+ Add from products…</option>
                       {products.map(p => <option key={p.id} value={p.id}>
-                        {p.name} — £{Number(p.default_price).toLocaleString('en-GB')}{stockCounts[p.id] != null ? ` (${stockCounts[p.id]} in stock)` : ''}
+                        {p.name} — ${Number(p.default_price).toLocaleString('en-US')}{stockCounts[p.id] != null ? ` (${stockCounts[p.id]} in stock)` : ''}
                       </option>)}
                     </select>
                   ) : (
                     <span className="text-[11px] text-dim italic">No products in the catalogue yet — add them under Inventory → Products</span>
                   )}
-                  <button onClick={() => setLines(p => [...p, { _new: true, name: '', description: '', qty: 1, unit_price: 0, tax_rate: 20 }])}
+                  <button onClick={() => setLines(p => [...p, { _new: true, name: '', description: '', qty: 1, unit_price: 0, tax_rate: 0 }])}
                     className="text-xs text-ember hover:text-ember-deep font-medium flex items-center gap-1"><Plus size={13} /> Blank line</button>
                 </div>
               )}
@@ -209,22 +206,22 @@ export default function InvoiceBuilder({ invoiceId, profile, onClose, onNavigate
                 <div className="grid grid-cols-3 gap-2">
                   <div><span className="text-[9px] text-dim block">Qty</span>
                     <input type="number" className={cell + ' w-full'} disabled={locked} value={l.qty} onChange={e => setLine(i, 'qty', e.target.value)} placeholder="1" /></div>
-                  <div><span className="text-[9px] text-dim block">Unit £ (ex VAT)</span>
+                  <div><span className="text-[9px] text-dim block">Unit $ (ex tax)</span>
                     <input type="number" className={cell + ' w-full'} disabled={locked} value={l.unit_price} onChange={e => setLine(i, 'unit_price', e.target.value)} placeholder="0.00" /></div>
-                  <div><span className="text-[9px] text-dim block">VAT %</span>
-                    <input type="number" className={cell + ' w-full'} disabled={locked} value={l.tax_rate ?? 20} onChange={e => setLine(i, 'tax_rate', e.target.value)} placeholder="20" /></div>
+                  <div><span className="text-[9px] text-dim block">Sales Tax %</span>
+                    <input type="number" className={cell + ' w-full'} disabled={locked} value={l.tax_rate ?? 0} onChange={e => setLine(i, 'tax_rate', e.target.value)} placeholder="0" /></div>
                 </div>
                 <div className="text-right text-xs text-muted">
                   Net: <span className="text-paper font-mono font-semibold">{money((Number(l.qty) || 0) * (Number(l.unit_price) || 0))}</span>
                   <span className="mx-1.5 text-dim">·</span>
-                  VAT: <span className="text-paper font-mono font-semibold">{money((Number(l.qty) || 0) * (Number(l.unit_price) || 0) * (Number(l.tax_rate) || 0) / 100)}</span>
+                  Tax: <span className="text-paper font-mono font-semibold">{money((Number(l.qty) || 0) * (Number(l.unit_price) || 0) * (Number(l.tax_rate) || 0) / 100)}</span>
                 </div>
               </div>
             ))}
             <div className="flex justify-end pt-2 border-t border-bdr">
               <div className="w-64 space-y-1.5 text-sm">
                 <div className="flex justify-between text-muted"><span>Subtotal</span><span className="tabular-nums">{money(subtotal)}</span></div>
-                <div className="flex justify-between text-muted"><span>VAT (per line)</span><span className="tabular-nums">{money(taxAmount)}</span></div>
+                <div className="flex justify-between text-muted"><span>Sales Tax</span><span className="tabular-nums">{money(taxAmount)}</span></div>
                 <div className="flex justify-between text-base font-bold text-paper pt-1.5 border-t border-bdr"><span>Total</span><span className="tabular-nums">{money(total)}</span></div>
                 {inv.status === 'paid' && <div className="flex justify-between text-emerald-600 font-semibold"><span>Paid</span><span className="tabular-nums">{money(inv.amount_paid ?? total)}</span></div>}
               </div>

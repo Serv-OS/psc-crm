@@ -22,11 +22,11 @@ const STATUSES = ['draft', 'sent', 'viewed', 'signed', 'paid', 'won', 'declined'
 
 export default function QuotesPanel({ profile, onNavigate }) {
   const [quotes, setQuotes] = useState([]);
-  const [companies, setCompanies] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [creating, setCreating] = useState(false);
-  const [newCompany, setNewCompany] = useState('');
+  const [newLocation, setNewLocation] = useState('');
   const [newContact, setNewContact] = useState('');
   const [loading, setLoading] = useState(true);
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
@@ -34,12 +34,12 @@ export default function QuotesPanel({ profile, onNavigate }) {
   const load = useCallback(async () => {
     setLoading(true);
     const [q, c, ct] = await Promise.all([
-      supabase.from('quotes').select('*, company:companies(name), contact:contacts(first_name, last_name), location:locations(name)')
+      supabase.from('quotes').select('*, contact:contacts(first_name, last_name), location:locations(name, city)')
         .order('created_at', { ascending: false }),
-      supabase.from('companies').select('id, name').order('name'),
+      supabase.from('locations').select('id, name, city').order('name'),
       supabase.from('contacts').select('id, first_name, last_name, email').order('last_name'),
     ]);
-    setQuotes(q.data || []); setCompanies(c.data || []); setContacts(ct.data || []);
+    setQuotes(q.data || []); setLocations(c.data || []); setContacts(ct.data || []);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -47,11 +47,11 @@ export default function QuotesPanel({ profile, onNavigate }) {
   const createQuote = async () => {
     const { data, error } = await supabase.from('quotes').insert({
       status: 'draft', created_by: profile.id,
-      company_id: newCompany || null, contact_id: newContact || null,
+      location_id: newLocation || null, contact_id: newContact || null,
       valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     }).select('id').single();
     if (error) { alert(error.message); return; }
-    setCreating(false); setNewCompany(''); setNewContact('');
+    setCreating(false); setNewLocation(''); setNewContact('');
     onNavigate?.('quote', data.id);
   };
 
@@ -108,10 +108,10 @@ export default function QuotesPanel({ profile, onNavigate }) {
           {creating && (
             <div className="glass-card rounded-2xl p-4 flex items-end gap-3 flex-wrap">
               <div className="flex-1 min-w-44">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block">Company</label>
-                <select className={input + ' w-full'} value={newCompany} onChange={e => setNewCompany(e.target.value)}>
+                <label className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block">Location</label>
+                <select className={input + ' w-full'} value={newLocation} onChange={e => setNewLocation(e.target.value)}>
                   <option value="">— Optional —</option>
-                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}{l.city ? ` (${l.city})` : ''}</option>)}
                 </select>
               </div>
               <div className="flex-1 min-w-44">
@@ -158,8 +158,8 @@ export default function QuotesPanel({ profile, onNavigate }) {
                       className="border-b border-bdr/50 last:border-0 cursor-pointer hover:bg-card/60 transition">
                       <td className="px-4 py-3 font-semibold text-paper">Q-{q.quote_number}</td>
                       <td className="px-4 py-3">
-                        <div className="text-paper">{q.company?.name || contactName(q) || '—'}</div>
-                        <div className="text-xs text-dim">{q.location?.name || (q.company?.name ? contactName(q) : '')}</div>
+                        <div className="text-paper">{q.location?.name || contactName(q) || '—'}</div>
+                        <div className="text-xs text-dim">{q.location?.city || contactName(q)}</div>
                       </td>
                       <td className="px-4 py-3 text-muted hidden md:table-cell">{fmtD(q.created_at)}</td>
                       <td className="px-4 py-3 text-muted hidden md:table-cell">{fmtD(q.valid_until)}</td>

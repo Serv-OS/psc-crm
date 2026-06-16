@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Receipt, Plus, Repeat, X, Trash2 } from 'lucide-react';
 
-export const money = (v) => `£${Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const money = (v) => `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtD = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }) : '—';
 
 // Effective display status: sent/viewed past due = overdue
@@ -197,7 +197,7 @@ function ScheduleModal({ schedule, companies, locations, contacts, products = []
   const total = subtotal * (1 + Number(f.tax_rate || 0) / 100);
 
   const save = async () => {
-    if (!f.company_id && !f.contact_id) { alert('Pick a customer (company or contact)'); return; }
+    if (!f.contact_id && !f.location_id) { alert('Pick a customer (contact or location)'); return; }
     const cleanLines = lines.filter(l => (l.name || '').trim());
     if (!cleanLines.length) { alert('Add at least one line item'); return; }
     const row = {
@@ -234,13 +234,10 @@ function ScheduleModal({ schedule, companies, locations, contacts, products = []
             <div><label className={label}>Label (optional)</label><input className={input} value={f.label} onChange={e => set('label', e.target.value)} placeholder="e.g. Monthly SaaS plan" /></div>
             <div><label className={label}>Send to (email)</label><input className={input} value={f.email_to} onChange={e => set('email_to', e.target.value)} placeholder="defaults to contact's email" /></div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className={label}>Company</label>
-              <select className={input} value={f.company_id} onChange={e => { set('company_id', e.target.value); set('location_id', ''); }}>
-                <option value="">—</option>{companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+          <div className="grid grid-cols-2 gap-3">
             <div><label className={label}>Location</label>
               <select className={input} value={f.location_id} onChange={e => set('location_id', e.target.value)}>
-                <option value="">—</option>{locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
+                <option value="">—</option>{locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
             <div><label className={label}>Contact</label>
               <select className={input} value={f.contact_id} onChange={e => set('contact_id', e.target.value)}>
                 <option value="">—</option>{contacts.map(c => <option key={c.id} value={c.id}>{[c.first_name, c.last_name].filter(Boolean).join(' ') || c.email}</option>)}</select></div>
@@ -270,7 +267,7 @@ function ScheduleModal({ schedule, companies, locations, contacts, products = []
                       });
                     }}>
                     <option value="">+ From products…</option>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.name} — £{Number(p.default_price).toLocaleString('en-GB')}</option>)}
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name} — ${Number(p.default_price).toLocaleString('en-US')}</option>)}
                   </select>
                 )}
                 <button onClick={() => setLines(p => [...p, { name: '', description: '', qty: 1, unit_price: 0 }])}

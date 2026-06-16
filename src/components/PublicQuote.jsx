@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LogoLockup } from './ServOSLogo.jsx';
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-const money = (v) => `£${Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (v) => `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const CAT = { hardware: 'Hardware', services: 'Services', saas: 'SaaS plan', payments: 'Payments' };
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
@@ -143,7 +143,7 @@ export default function PublicQuote({ token }) {
       <div className="px-6 sm:px-8 py-4 bg-slate-50 border-y border-slate-200">
         <div className="ml-auto max-w-xs space-y-1">
           <Row k="One-off subtotal" v={money(q.one_off_subtotal)} />
-          <Row k="VAT" v={money(q.tax_amount)} />
+          <Row k="Sales Tax" v={money(q.tax_amount)} />
           <Row k="Due on acceptance" v={money(q.one_off_total)} bold accent={accent} />
           {q.recurring_arr > 0 && <Row k="Ongoing (per year)" v={money(q.recurring_arr)} sub />}
         </div>

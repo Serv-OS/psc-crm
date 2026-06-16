@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 // customer pays by card via Stripe Checkout.
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-const money = (v) => `£${Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (v) => `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
 export default function PublicInvoice({ token }) {
@@ -92,7 +92,7 @@ export default function PublicInvoice({ token }) {
                 <th className="text-left py-2 font-bold">Item</th>
                 <th className="text-right py-2 font-bold w-14">Qty</th>
                 <th className="text-right py-2 font-bold w-24">Price</th>
-                <th className="text-right py-2 font-bold w-14">VAT</th>
+                <th className="text-right py-2 font-bold w-14">Tax</th>
                 <th className="text-right py-2 font-bold w-24">Amount</th>
               </tr>
             </thead>
@@ -116,7 +116,7 @@ export default function PublicInvoice({ token }) {
           <div className="flex justify-end mt-4">
             <div className="w-60 space-y-1.5 text-sm">
               <div className="flex justify-between text-slate-500"><span>Subtotal</span><span className="tabular-nums">{money(inv.subtotal)}</span></div>
-              <div className="flex justify-between text-slate-500"><span>VAT</span><span className="tabular-nums">{money(inv.tax_amount)}</span></div>
+              <div className="flex justify-between text-slate-500"><span>Sales Tax</span><span className="tabular-nums">{money(inv.tax_amount)}</span></div>
               <div className="flex justify-between text-base font-bold text-slate-900 pt-1.5 border-t border-slate-200"><span>Total due</span><span className="tabular-nums">{money(inv.total)}</span></div>
             </div>
           </div>

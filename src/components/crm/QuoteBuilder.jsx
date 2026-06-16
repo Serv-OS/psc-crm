@@ -16,13 +16,13 @@ const STATUS_STYLES = {
 };
 
 const lineTotal = (it) => (Number(it.qty) || 0) * (Number(it.unit_price) || 0) * (1 - (Number(it.discount) || 0) / 100);
-const money = (v) => `£${Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (v) => `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) {
   const [quote, setQuote] = useState(null);
   const [items, setItems] = useState([]);
   const [products, setProducts] = useState([]);
-  const [company, setCompany] = useState(null);
+  const [location, setLocation] = useState(null);
   const [contact, setContact] = useState(null);
   const [locations, setLocations] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -41,22 +41,19 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
     setQuote(q.data);
     setItems((li.data || []).map(x => ({ ...x })));
     setProducts(pr.data || []);
-    if (q.data?.company_id) {
-      supabase.from('companies').select('id, name').eq('id', q.data.company_id).single().then(r => setCompany(r.data));
-      supabase.from('locations').select('id, name').eq('company_id', q.data.company_id).order('name').then(r => setLocations(r.data || []));
-    } else {
-      supabase.from('locations').select('id, name').order('name').limit(200).then(r => setLocations(r.data || []));
-    }
+    supabase.from('locations').select('id, name, city').order('name').limit(200).then(r => setLocations(r.data || []));
+    if (q.data?.location_id) supabase.from('locations').select('id, name, city').eq('id', q.data.location_id).single().then(r => setLocation(r.data));
+    else setLocation(null);
     if (q.data?.contact_id) supabase.from('contacts').select('id, first_name, last_name, email').eq('id', q.data.contact_id).single().then(r => setContact(r.data));
   };
 
   const setQ = (k, v) => setQuote(prev => ({ ...prev, [k]: v }));
   const updateItem = (idx, patch) => setItems(items.map((it, i) => i === idx ? { ...it, ...patch } : it));
   const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
-  const addCustom = () => setItems([...items, { product_id: null, name: '', description: '', category: 'hardware', billing_type: 'one_off', qty: 1, unit_price: 0, discount: 0, tax_rate: 20 }]);
+  const addCustom = () => setItems([...items, { product_id: null, name: '', description: '', category: 'hardware', billing_type: 'one_off', qty: 1, unit_price: 0, discount: 0, tax_rate: 0 }]);
   const addProduct = (p) => setItems([...items, {
     product_id: p.id, name: p.name, description: p.description || '', category: p.category,
-    billing_type: p.billing_type, qty: 1, unit_price: p.default_price, discount: 0, tax_rate: 20,
+    billing_type: p.billing_type, qty: 1, unit_price: p.default_price, discount: 0, tax_rate: 0,
   }]);
 
   const totals = useMemo(() => {
@@ -128,7 +125,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
             <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${STATUS_STYLES[quote.status]}`}>{quote.status}</span>
           </div>
           <div className="text-xs text-muted mt-0.5">
-            {company?.name || 'No company'}{contact ? ` · ${[contact.first_name, contact.last_name].filter(Boolean).join(' ')}` : ''}
+            {location?.name || 'No location'}{contact ? ` · ${[contact.first_name, contact.last_name].filter(Boolean).join(' ')}` : ''}
           </div>
         </div>
         {canWrite && (
@@ -176,7 +173,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
                       <div><span className="text-[9px] text-dim block">Qty</span><input type="number" className={cell + ' w-full'} value={it.qty} onChange={e => updateItem(idx, { qty: e.target.value })} /></div>
                       <div><span className="text-[9px] text-dim block">Unit £</span><input type="number" className={cell + ' w-full'} value={it.unit_price} onChange={e => updateItem(idx, { unit_price: e.target.value })} /></div>
                       <div><span className="text-[9px] text-dim block">Disc %</span><input type="number" className={cell + ' w-full'} value={it.discount} onChange={e => updateItem(idx, { discount: e.target.value })} /></div>
-                      <div><span className="text-[9px] text-dim block">Tax %</span><input type="number" className={cell + ' w-full'} value={it.tax_rate ?? 20} onChange={e => updateItem(idx, { tax_rate: e.target.value })} disabled={it.category === 'saas' || it.category === 'payments'} /></div>
+                      <div><span className="text-[9px] text-dim block">Sales Tax %</span><input type="number" className={cell + ' w-full'} value={it.tax_rate ?? 0} onChange={e => updateItem(idx, { tax_rate: e.target.value })} disabled={it.category === 'saas' || it.category === 'payments'} /></div>
                     </div>
                     <div className="text-right text-xs text-muted">Line total: <span className="text-paper font-mono font-semibold">{money(lineTotal(it))}</span>{it.billing_type === 'monthly' ? '/mo' : it.category === 'payments' ? '/yr' : ''}</div>
                   </div>
@@ -196,7 +193,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
             <div className="glass-card rounded-2xl p-4">
               <div className="text-sm font-bold text-paper mb-3">Totals</div>
               <Row k="One-off subtotal" v={money(totals.oneOff)} />
-              <Row k="VAT (per line)" v={money(totals.tax)} />
+              <Row k="Sales Tax" v={money(totals.tax)} />
               <Row k="One-off total" v={money(totals.oneOffTotal)} bold />
               <div className="border-t border-bdr my-2" />
               <Row k="SaaS (ARR)" v={money(totals.saasArr)} sub />
