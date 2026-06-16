@@ -98,7 +98,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
       name: `Deal: ${lead.name}`, company_id: lead.company_id, owner_id: lead.owner_id || profile.id, source: lead.source,
     }).select().single();
     if (deal) {
-      await supabase.from('stage_history').insert({ object_type: 'deal', object_id: deal.id, from_stage: null, to_stage: 'new_lead', changed_by: profile.id });
+      await supabase.from('stage_history').insert({ object_type: 'deal', object_id: deal.id, from_stage: null, to_stage: 'estimate', changed_by: profile.id });
       if (lead.contact_id) await supabase.from('associations').insert({ from_type: 'deal', from_id: deal.id, to_type: 'contact', to_id: lead.contact_id, label: 'primary_contact' });
       if (lead.location_id) await supabase.from('associations').insert({ from_type: 'deal', from_id: deal.id, to_type: 'location', to_id: lead.location_id, label: 'affected_location' });
       await supabase.from('leads').update({ stage: 'qualified', deal_id: deal.id }).eq('id', leadId);

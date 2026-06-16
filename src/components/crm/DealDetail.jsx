@@ -5,13 +5,12 @@ import AssociationManager from './AssociationManager.jsx';
 import ActivityTimeline from './ActivityTimeline.jsx';
 
 const STAGES = [
-  'new_lead','contacted','qualified','demo_booked','demo_done',
-  'proposal_sent','negotiation','closed_won','closed_lost'
+  'estimate','proposal_sent','negotiation','verbal','contract_signed','closed_won','closed_lost'
 ];
 const STAGE_LABELS = {
-  new_lead:'New Lead', contacted:'Contacted', qualified:'Qualified',
-  demo_booked:'Demo Booked', demo_done:'Demo Done', proposal_sent:'Proposal Sent',
-  negotiation:'Negotiation', closed_won:'Closed Won', closed_lost:'Closed Lost',
+  estimate:'Estimate / Quote', proposal_sent:'Proposal Sent', negotiation:'Negotiation',
+  verbal:'Verbal Commitment', contract_signed:'Contract Signed',
+  closed_won:'Won', closed_lost:'Lost',
 };
 
 export default function DealDetail({ dealId, profile, onClose, onNavigate }) {

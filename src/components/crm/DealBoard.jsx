@@ -3,15 +3,13 @@ import { supabase } from '../../lib/supabase';
 import { handleClosedWon } from '../../lib/dealHelpers';
 
 const STAGES = [
-  { key: 'new_lead',       label: 'New Lead',       color: '#3b82f6' },
-  { key: 'contacted',      label: 'Contacted',      color: '#6366f1' },
-  { key: 'qualified',      label: 'Qualified',      color: '#8b5cf6' },
-  { key: 'demo_booked',    label: 'Demo Booked',    color: '#a855f7' },
-  { key: 'demo_done',      label: 'Demo Done',      color: '#E8743C' },
-  { key: 'proposal_sent',  label: 'Proposal Sent',  color: '#C75A29' },
-  { key: 'negotiation',    label: 'Negotiation',    color: '#eab308' },
-  { key: 'closed_won',     label: 'Closed Won',     color: '#10b981' },
-  { key: 'closed_lost',    label: 'Closed Lost',    color: '#ef4444' },
+  { key: 'estimate',        label: 'Estimate / Quote',   color: '#3b82f6' },
+  { key: 'proposal_sent',   label: 'Proposal Sent',      color: '#6366f1' },
+  { key: 'negotiation',     label: 'Negotiation',        color: '#eab308' },
+  { key: 'verbal',          label: 'Verbal Commitment',  color: '#a855f7' },
+  { key: 'contract_signed', label: 'Contract Signed',    color: '#C75A29' },
+  { key: 'closed_won',      label: 'Won',                color: '#10b981' },
+  { key: 'closed_lost',     label: 'Lost',               color: '#ef4444' },
 ];
 
 export default function DealBoard({ profile, onSelectDeal, onNavigate }) {
