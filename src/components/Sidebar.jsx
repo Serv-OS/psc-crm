@@ -16,12 +16,8 @@ const COLLAPSIBLE = [
     ['leads', 'Leads', Target], ['deals', 'Deals', Banknote],
     ['quotes', 'Quotes', FileSignature], ['invoices', 'Invoices', Receipt],
   ] },
-  { id: 'inventory', label: 'Inventory', items: [
-    ['inv_dashboard', 'Dashboard', Warehouse], ['products', 'Products', Box], ['inv_stock', 'Stock', Boxes],
-    ['inv_in', 'Stock In', PackagePlus], ['inv_out', 'Stock Out', PackageMinus],
-    ['inv_orders', 'Orders (POs)', ShoppingCart], ['inv_shipments', 'Shipments', Truck],
-    ['inv_suppliers', 'Suppliers', Factory], ['inv_stocktake', 'Stocktake', ClipboardCheck],
-    ['inv_reports', 'Reports', BarChart3],
+  { id: 'pricing', label: 'Pricing', items: [
+    ['pricing', 'Line-item prices', Box],
   ] },
   { id: 'delivery', label: 'Delivery', items: [
     ['onboarding', 'Onboarding', Rocket], ['projects', 'Projects', Folder], ['tasks', 'Tasks', CheckSquare],
@@ -43,13 +39,13 @@ const PROJECT_ICON = { 'bugs': Bug, 'features': Star, 'todo': List, 'ui changes'
 // Map detail views back to the nav item that should stay highlighted
 const ACTIVE_MAP = {
   company_detail: 'companies', contact_detail: 'contacts', location_detail: 'locations',
-  lead_detail: 'leads', deal_detail: 'deals', quote_detail: 'deals',
+  lead_detail: 'leads', deal_detail: 'deals',
   onboarding_detail: 'onboarding', project_detail: 'projects', task_detail: 'tasks',
   ticket_detail: 'tickets', form_detail: 'forms', feature_request_detail: 'feature_requests',
   release_detail: 'releases', invoice_detail: 'invoices', quote_detail: 'quotes',
 };
 
-const DEFAULT_GROUPS = { appbuild: false, sales: true, inventory: true, delivery: false, support: false, product: false, workforce: false, insights: false };
+const DEFAULT_GROUPS = { appbuild: false, sales: true, pricing: true, delivery: false, support: false, product: false, workforce: false, insights: false };
 
 export default function Sidebar({ profile, projects, activeProject, setActiveProject, view, setView, onSignOut, onRefresh, theme }) {
   const [logos, setLogos] = useState({ light: null, dark: null });

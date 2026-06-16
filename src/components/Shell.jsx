@@ -10,13 +10,7 @@ import InvoicesPanel from './crm/InvoicesPanel.jsx';
 import QuotesPanel from './crm/QuotesPanel.jsx';
 import CallLogPanel from './crm/CallLogPanel.jsx';
 import SalesPerformance from './crm/SalesPerformance.jsx';
-import InvDashboard from './inventory/InvDashboard.jsx';
-import StockView from './inventory/StockView.jsx';
-import StockInView from './inventory/StockInView.jsx';
-import StockOutView from './inventory/StockOutView.jsx';
-import PurchasingView from './inventory/PurchasingView.jsx';
-import StocktakeView from './inventory/StocktakeView.jsx';
-import InvReportsView from './inventory/InvReportsView.jsx';
+import PricingCatalogue from './crm/PricingCatalogue.jsx';
 import InvoiceBuilder from './crm/InvoiceBuilder.jsx';
 import ScheduleView from './staffing/ScheduleView.jsx';
 import TimeOffView from './staffing/TimeOffView.jsx';
@@ -61,7 +55,6 @@ import CalendarPanel from './crm/CalendarPanel.jsx';
 import ChatPanel from './crm/ChatPanel.jsx';
 import DataPanel from './crm/DataPanel.jsx';
 import LeadDetail from './crm/LeadDetail.jsx';
-import ProductsPanel from './crm/ProductsPanel.jsx';
 import QuoteBuilder from './crm/QuoteBuilder.jsx';
 import { Sun, Moon } from 'lucide-react';
 
@@ -201,29 +194,10 @@ export default function Shell({ session }) {
         return <ReportingDashboard profile={profile} />;
       case 'sales_performance':
         return <SalesPerformance profile={profile} onNavigate={navigateTo} />;
-      case 'inv_dashboard':
-        return <InvDashboard profile={profile} onNavigate={(t, id) => t === 'view' ? setView(id) : navigateTo(t, id)} />;
-      case 'inv_stock':
-        return <StockView profile={profile} onNavigate={navigateTo} />;
-      case 'inv_in':
-        return <StockInView profile={profile} />;
-      case 'inv_out':
-        return <StockOutView profile={profile} onNavigate={navigateTo} />;
-      case 'inv_purchasing':
-      case 'inv_orders':
-        return <PurchasingView profile={profile} initialTab="orders" />;
-      case 'inv_shipments':
-        return <PurchasingView profile={profile} initialTab="transit" />;
-      case 'inv_suppliers':
-        return <PurchasingView profile={profile} initialTab="suppliers" />;
-      case 'inv_stocktake':
-        return <StocktakeView profile={profile} />;
-      case 'inv_reports':
-        return <InvReportsView />;
+      case 'pricing':
+        return <PricingCatalogue profile={profile} />;
       case 'data':
         return <DataPanel profile={profile} />;
-      case 'products':
-        return <ProductsPanel profile={profile} />;
       case 'quote_detail':
         return <QuoteBuilder quoteId={detailId} profile={profile} onClose={() => setView('quotes')} onNavigate={navigateTo} />;
       case 'settings':
