@@ -144,12 +144,6 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="badge-status bg-blue-100 text-blue-700 border border-blue-200">{STAGE_LABELS[deal.stage]}</span>
             {deal.value && <span className="text-sm font-bold text-ember font-mono">{fmt(deal.value)}</span>}
-            {company && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-lg bg-slate-100 text-slate-600 border border-slate-200 cursor-pointer hover:border-slate-300"
-                onClick={() => onNavigate?.('company', company.id)}>
-                {'\u{1F3E2}'} {company.name}
-              </span>
-            )}
           </div>
         </div>
         {canWrite && !editing && (
@@ -185,8 +179,6 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
             <Card title="Edit Deal">
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={label}>Name</label><input className={input} value={draft.name || ''} onChange={e => set('name', e.target.value)} /></div>
-                <div><label className={label}>Company</label><select className={input} value={draft.company_id || ''} onChange={e => set('company_id', e.target.value)}>
-                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 <div><label className={label}>Stage</label><select className={input} value={draft.stage} onChange={e => set('stage', e.target.value)}>
                   {STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}</select></div>
                 <div><label className={label}>Source</label><input className={input} value={draft.source || ''} onChange={e => set('source', e.target.value)} /></div>
@@ -245,31 +237,8 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
                 </div>
               </Card>
 
-              <Card title="Company">
-                {company ? (
-                  <div onClick={() => onNavigate?.('company', company.id)}
-                    className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-ember/15 border border-ember/25 flex items-center justify-center text-lg shrink-0">{'\u{1F3E2}'}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-base font-semibold text-paper">{company.name}</div>
-                      <div className="text-xs text-muted">Company</div>
-                    </div>
-                  </div>
-                ) : <Empty>No company</Empty>}
-              </Card>
-
-              <Card title="Locations" count={companyLocations.length}>
-                {companyLocations.length > 0 ? (
-                  <div className="space-y-2">
-                    {companyLocations.map(l => (
-                      <div key={l.id} onClick={() => onNavigate?.('location', l.id)}
-                        className="p-3 glass-inner rounded-xl cursor-pointer">
-                        <div className="text-sm font-medium text-paper">{l.name}</div>
-                        <div className="text-xs text-muted">{[l.venue_type, l.city].filter(Boolean).join(' / ')}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <Empty>No locations for this company</Empty>}
+              <Card title="Locations">
+                <AssociationManager subjectType="deal" subjectId={dealId} targetType="location" profile={profile} onNavigate={onNavigate} />
               </Card>
             </div>
 
