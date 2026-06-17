@@ -1,16 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-
-const STAGES = [
-  { key: 'kickoff',              label: 'Kickoff',           color: '#3b82f6' },
-  { key: 'hardware_ordered',     label: 'HW Ordered',        color: '#6366f1' },
-  { key: 'hardware_shipped',     label: 'HW Shipped',        color: '#8b5cf6' },
-  { key: 'account_menu_config',  label: 'Config',            color: '#a855f7' },
-  { key: 'staff_training',       label: 'Training',          color: '#E8743C' },
-  { key: 'go_live_scheduled',    label: 'Go-Live Sched.',    color: '#C75A29' },
-  { key: 'live',                 label: 'Live',              color: '#10b981' },
-  { key: 'handover_to_support',  label: 'Handover',          color: '#948A7A' },
-];
+import { BUILD_STAGES as STAGES } from '../../lib/buildStages';
 
 export default function OnboardingBoard({ profile, onSelectOnboarding, onNavigate }) {
   const [onboardings, setOnboardings] = useState([]);
@@ -103,7 +93,7 @@ export default function OnboardingBoard({ profile, onSelectOnboarding, onNavigat
         <div>
           <div className="text-lg font-bold text-paper">Build Stages</div>
           <div className="text-[10px] text-dim font-mono uppercase tracking-[0.18em]">
-            {onboardings.length} build stages / {onboardings.filter(o => o.stage === 'live').length} live
+            {onboardings.length} build stages / {onboardings.filter(o => o.stage === 'in_progress').length} in progress
           </div>
         </div>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, location or owner…"

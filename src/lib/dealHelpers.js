@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { FIRST_BUILD_STAGE } from './buildStages';
 
 /**
  * When a deal moves to closed_won, auto-create an onboarding record
@@ -30,7 +31,7 @@ export async function handleClosedWon(dealId, profileId) {
     object_type: 'onboarding',
     object_id: onboarding.id,
     from_stage: null,
-    to_stage: 'kickoff',
+    to_stage: FIRST_BUILD_STAGE,
     changed_by: profileId,
   });
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import AssociationManager from './AssociationManager.jsx';
 import { PROPERTY_TYPES, propertyTypeLabel } from '../../lib/propertyTypes';
+import { BUILD_STAGE_LABELS } from '../../lib/buildStages';
 import ActivityTimeline from './ActivityTimeline.jsx';
 import CallButton from '../CallButton.jsx';
 import LeadBadge from './LeadBadge.jsx';
@@ -99,7 +100,6 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
 
   const MODULE_STATUS = { quoted:'bg-slate-100 text-slate-600 border border-slate-200', included:'bg-blue-100 text-blue-700 border border-blue-200', enabling:'bg-orange-100 text-orange-700 border border-orange-200', live:'bg-emerald-100 text-emerald-700 border border-emerald-200', disabled:'bg-red-100 text-red-700 border border-red-200' };
   const DEAL_STAGES = { new_lead:'New Lead', contacted:'Contacted', qualified:'Qualified', demo_booked:'Demo Booked', demo_done:'Demo Done', proposal_sent:'Proposal', negotiation:'Negotiation', closed_won:'Won', closed_lost:'Lost' };
-  const OB_STAGES = { kickoff:'Kickoff', hardware_ordered:'HW Ordered', hardware_shipped:'HW Shipped', account_menu_config:'Config', staff_training:'Training', go_live_scheduled:'Go-Live', live:'Live', handover_to_support:'Handover' };
 
   return (
     <div className="h-full flex flex-col">
@@ -227,7 +227,7 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
                       <div key={o.id} onClick={() => onNavigate?.('onboarding', o.id)}
                         className="p-3 glass-inner rounded-xl cursor-pointer">
                         <div className="text-sm font-medium text-paper">Build Stage</div>
-                        <div className="text-xs text-muted mt-0.5">{OB_STAGES[o.stage] || o.stage}</div>
+                        <div className="text-xs text-muted mt-0.5">{BUILD_STAGE_LABELS[o.stage] || o.stage}</div>
                       </div>
                     ))}
                   </div>

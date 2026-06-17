@@ -2,16 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import AssociationManager from './AssociationManager.jsx';
 import ActivityTimeline from './ActivityTimeline.jsx';
-
-const STAGES = [
-  'kickoff','hardware_ordered','hardware_shipped','account_menu_config',
-  'staff_training','go_live_scheduled','live','handover_to_support'
-];
-const STAGE_LABELS = {
-  kickoff:'Kickoff', hardware_ordered:'HW Ordered', hardware_shipped:'HW Shipped',
-  account_menu_config:'Config', staff_training:'Training', go_live_scheduled:'Go-Live Sched.',
-  live:'Live', handover_to_support:'Handover',
-};
+import { BUILD_STAGE_KEYS as STAGES, BUILD_STAGE_LABELS as STAGE_LABELS } from '../../lib/buildStages';
 
 export default function OnboardingDetail({ onboardingId, profile, onClose, onNavigate }) {
   const [ob, setOb] = useState(null);

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
+import { BUILD_STAGE_LABELS } from '../../lib/buildStages';
 
 // CEO-defined targets (see project_sales_targets memory)
 const MONTHLY_ARR_QUOTA = 48000;   // $48K new ARR per AE per month
@@ -138,7 +139,12 @@ export default function ReportingDashboard({ profile }) {
   const obMetrics = useMemo(() => {
     const byStage = {};
     onboardings.forEach(o => { byStage[o.stage] = (byStage[o.stage] || 0) + 1; });
-    return { total: onboardings.length, live: onboardings.filter(o => o.stage === 'live').length, byStage };
+    return {
+      total: onboardings.length,
+      completed: onboardings.filter(o => o.stage === 'completed').length,
+      inProgress: onboardings.filter(o => o.stage === 'in_progress').length,
+      byStage,
+    };
   }, [onboardings]);
 
   // Support metrics
@@ -320,13 +326,13 @@ export default function ReportingDashboard({ profile }) {
             <>
               <div className="grid grid-cols-3 gap-3">
                 <MetricCard label="Total" value={obMetrics.total} />
-                <MetricCard label="Live" value={obMetrics.live} color="text-emerald-600" />
-                <MetricCard label="In Progress" value={obMetrics.total - obMetrics.live} color="text-orange-600" />
+                <MetricCard label="Completed" value={obMetrics.completed} color="text-emerald-600" />
+                <MetricCard label="In Progress" value={obMetrics.inProgress} color="text-orange-600" />
               </div>
               <div className="glass-card rounded-2xl p-4">
                 <div className={label + ' mb-3'}>By Stage</div>
                 {Object.entries(obMetrics.byStage).map(([k, v]) => (
-                  <div key={k} className="flex justify-between py-1 text-xs"><span className="text-paper">{k.replace(/_/g,' ')}</span><span className="text-ember font-mono">{v}</span></div>
+                  <div key={k} className="flex justify-between py-1 text-xs"><span className="text-paper">{BUILD_STAGE_LABELS[k] || k.replace(/_/g,' ')}</span><span className="text-ember font-mono">{v}</span></div>
                 ))}
               </div>
               <button onClick={() => exportCSV(
