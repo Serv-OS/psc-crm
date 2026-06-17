@@ -56,7 +56,6 @@ export default function OnboardingBoard({ profile, onSelectOnboarding, onNavigat
     return cl?.name || '';
   };
   const fmtD = (d) => d ? new Date(d).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '';
-  const fmtDT = (d) => d ? new Date(d).toLocaleString('en-US', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 
   const byStage = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -102,9 +101,9 @@ export default function OnboardingBoard({ profile, onSelectOnboarding, onNavigat
     <div className="h-full flex flex-col">
       <div className="px-6 py-4 border-b border-bdr flex items-center gap-4 flex-wrap">
         <div>
-          <div className="text-lg font-bold text-paper">Onboarding Pipeline</div>
+          <div className="text-lg font-bold text-paper">Build Stages</div>
           <div className="text-[10px] text-dim font-mono uppercase tracking-[0.18em]">
-            {onboardings.length} onboardings / {onboardings.filter(o => o.stage === 'live').length} live
+            {onboardings.length} build stages / {onboardings.filter(o => o.stage === 'live').length} live
           </div>
         </div>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search company, location or owner…"
@@ -123,22 +122,20 @@ export default function OnboardingBoard({ profile, onSelectOnboarding, onNavigat
               </div>
               <div className="flex-1 overflow-y-auto p-1.5 space-y-1.5">
                 {(byStage[stage.key] || []).map(o => {
+                  const cardName = dealName(o.deal_id) || locationName(o) || companyName(o.company_id) || 'Build Stage';
                   const rows = [
                     ['Company', companyName(o.company_id)],
                     ['Location', locationName(o)],
-                    ['Deal', dealName(o.deal_id)],
-                    ['Call', fmtDT(o.kickoff_at)],
                     ['Exp. install', fmtD(o.expected_install_date)],
                     ['Install', fmtD(o.actual_install_date)],
-                    ['Go live', fmtD(o.target_go_live)],
-                    ['Activation', fmtD(o.activation_date)],
-                  ].filter(([, v]) => v);
+                  ].filter(([, v]) => v && v !== cardName);
                   return (
                     <div key={o.id}
                       draggable={canWrite}
                       onDragStart={e => onDragStart(e, o)}
                       onClick={() => onSelectOnboarding(o.id)}
                       className="glass-inner rounded-xl p-3 cursor-pointer">
+                      <div className="text-sm font-semibold text-paper mb-2 truncate">{cardName}</div>
                       <table className="w-full text-xs">
                         <tbody>
                           {rows.map(([k, v]) => (

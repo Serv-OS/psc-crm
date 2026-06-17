@@ -97,7 +97,7 @@ export default function DealBoard({ profile, onSelectDeal, onNavigate }) {
     // Auto-create onboarding on closed_won
     if (toStage === 'closed_won') {
       const ob = await handleClosedWon(dealId, profile.id);
-      if (ob) alert('Onboarding created automatically for this deal.');
+      if (ob) alert('Build stage created automatically for this deal.');
     }
     load();
   };

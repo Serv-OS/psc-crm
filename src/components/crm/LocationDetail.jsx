@@ -156,7 +156,7 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
                 <div><label className={label}>Postcode</label><input className={input} value={draft.postcode || ''} onChange={e => set('postcode', e.target.value)} /></div>
                 <div><label className={label}>Phone</label><input className={input} value={draft.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
                 <div><label className={label}>Email</label><input className={input} value={draft.email || ''} onChange={e => set('email', e.target.value)} /></div>
-                <div><label className={label}>Onboarding call</label><input className={input} type="datetime-local" value={(draft.kickoff_at || '').slice(0, 16)} onChange={e => set('kickoff_at', e.target.value || null)} /></div>
+                <div><label className={label}>Kickoff call</label><input className={input} type="datetime-local" value={(draft.kickoff_at || '').slice(0, 16)} onChange={e => set('kickoff_at', e.target.value || null)} /></div>
                 <div><label className={label}>Expected install date</label><input className={input} type="date" value={draft.expected_install_date || ''} onChange={e => set('expected_install_date', e.target.value || null)} /></div>
                 <div><label className={label}>Actual install date</label><input className={input} type="date" value={draft.actual_install_date || ''} onChange={e => set('actual_install_date', e.target.value || null)} /></div>
                 <div><label className={label}>Go-live date</label><input className={input} type="date" value={draft.go_live_date || ''} onChange={e => set('go_live_date', e.target.value || null)} /></div>
@@ -220,18 +220,18 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
 
               <InvoicesCard locationId={locationId} profile={profile} onNavigate={onNavigate} />
 
-              <Card title="Onboardings" count={onboardings.length}>
+              <Card title="Build Stages" count={onboardings.length}>
                 {onboardings.length > 0 ? (
                   <div className="space-y-2">
                     {onboardings.map(o => (
                       <div key={o.id} onClick={() => onNavigate?.('onboarding', o.id)}
                         className="p-3 glass-inner rounded-xl cursor-pointer">
-                        <div className="text-sm font-medium text-paper">Onboarding</div>
+                        <div className="text-sm font-medium text-paper">Build Stage</div>
                         <div className="text-xs text-muted mt-0.5">{OB_STAGES[o.stage] || o.stage}</div>
                       </div>
                     ))}
                   </div>
-                ) : <Empty>No onboardings</Empty>}
+                ) : <Empty>No build stages</Empty>}
               </Card>
 
               <Card title="Projects" count={projects.length}

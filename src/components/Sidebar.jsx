@@ -23,7 +23,7 @@ const COLLAPSIBLE = [
     ['website', 'Website', Globe],
   ] },
   { id: 'delivery', label: 'Delivery', items: [
-    ['onboarding', 'Onboarding', Rocket], ['projects', 'Projects', Folder], ['tasks', 'Tasks', CheckSquare],
+    ['onboarding', 'Build Stages', Rocket], ['projects', 'Projects', Folder], ['tasks', 'Tasks', CheckSquare],
   ] },
   { id: 'support', label: 'Support', items: [
     ['tickets', 'Support', Ticket], ['calls', 'Call Log', PhoneCall], ['forms', 'Forms', ClipboardList], ['templates', 'Templates', FileText],

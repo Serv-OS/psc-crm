@@ -9,7 +9,7 @@ const STATUS_BADGE = {
 
 const SUBJECT_LABELS = {
   company: 'Company', location: 'Location', deal: 'Deal',
-  onboarding: 'Onboarding', ticket: 'Ticket',
+  onboarding: 'Build Stage', ticket: 'Ticket',
 };
 
 export default function ProjectList({ profile, onSelect }) {

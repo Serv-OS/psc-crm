@@ -186,7 +186,7 @@ export default function ReportingDashboard({ profile }) {
       <div className="px-6 py-2 border-b border-bdr flex gap-1 overflow-x-auto">
         {tabBtn('sales', 'Sales')}
         {tabBtn('quota', 'Quota & Commission')}
-        {tabBtn('onboarding', 'Onboarding')}
+        {tabBtn('onboarding', 'Build Stages')}
         {tabBtn('support', 'Support')}
         {tabBtn('tasks', 'Tasks')}
         {tabBtn('modules', 'Modules')}
@@ -332,8 +332,8 @@ export default function ReportingDashboard({ profile }) {
               <button onClick={() => exportCSV(
                 ['Company','Stage','Owner','Created'],
                 onboardings.map(o => [companies.find(c=>c.id===o.company_id)?.name, o.stage, ownerName(o.owner_id), o.created_at]),
-                'onboardings-export.csv'
-              )} className="px-3 py-1.5 text-xs text-muted border border-bdr rounded hover:text-paper">Export onboardings CSV</button>
+                'build-stages-export.csv'
+              )} className="px-3 py-1.5 text-xs text-muted border border-bdr rounded hover:text-paper">Export build stages CSV</button>
             </>
           )}
 

@@ -93,7 +93,7 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
     if (error) { alert('Save failed: ' + error.message); return; }
     if (patch.stage !== oldStage) {
       await supabase.from('stage_history').insert({ object_type: 'deal', object_id: dealId, from_stage: oldStage, to_stage: patch.stage, changed_by: profile.id });
-      if (patch.stage === 'closed_won') { const ob = await handleClosedWon(dealId, profile.id); if (ob) alert('Onboarding created automatically.'); }
+      if (patch.stage === 'closed_won') { const ob = await handleClosedWon(dealId, profile.id); if (ob) alert('Build stage created automatically.'); }
     }
     setEditing(false); load();
   };
@@ -106,7 +106,7 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
     else patch.closed_at = null;
     await supabase.from('deals').update(patch).eq('id', dealId);
     await supabase.from('stage_history').insert({ object_type: 'deal', object_id: dealId, from_stage: deal.stage, to_stage: newStage, changed_by: profile.id });
-    if (newStage === 'closed_won') { const ob = await handleClosedWon(dealId, profile.id); if (ob) alert('Onboarding created automatically.'); }
+    if (newStage === 'closed_won') { const ob = await handleClosedWon(dealId, profile.id); if (ob) alert('Build stage created automatically.'); }
     load();
   };
 

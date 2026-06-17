@@ -85,7 +85,7 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
   };
 
   const createLinkedProject = async () => {
-    const name = prompt(`Project name for ${company?.name || 'this'} onboarding:`);
+    const name = prompt(`Project name for ${deal?.name || company?.name || 'this'} build stage:`);
     if (!name?.trim()) return;
     const { data } = await supabase.from('crm_projects').insert({
       name: name.trim(), subject_type: 'onboarding', subject_id: onboardingId, owner_id: profile.id,
@@ -108,7 +108,7 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
         <button onClick={onClose} className="text-muted hover:text-paper text-lg">&larr;</button>
         <div className="flex-1 min-w-0">
           <div className="text-xl font-bold text-paper truncate">
-            {company?.name || 'Unknown'} Onboarding
+            {deal?.name || locations.find(l => l.id === ob.location_id)?.name || company?.name || 'Build Stage'}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="badge-status bg-orange-100 text-orange-700 border border-orange-200">{STAGE_LABELS[ob.stage]}</span>
@@ -153,7 +153,7 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
       <div className="flex-1 overflow-y-auto p-6">
         {editing ? (
           <div className="max-w-3xl">
-            <Card title="Edit Onboarding">
+            <Card title="Edit Build Stage">
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={label}>Stage</label>
                   <select className={input} value={draft.stage} onChange={e => set('stage', e.target.value)}>
@@ -171,16 +171,10 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
                     <option value="">— None —</option>
                     {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select></div>
-                <div><label className={label}>Onboarding call (date &amp; time)</label>
-                  <input type="datetime-local" className={input} value={(draft.kickoff_at || '').slice(0, 16)} onChange={e => set('kickoff_at', e.target.value || null)} /></div>
                 <div><label className={label}>Expected install date</label>
                   <input type="date" className={input} value={draft.expected_install_date || ''} onChange={e => set('expected_install_date', e.target.value || null)} /></div>
                 <div><label className={label}>Actual install date</label>
                   <input type="date" className={input} value={draft.actual_install_date || ''} onChange={e => set('actual_install_date', e.target.value || null)} /></div>
-                <div><label className={label}>Go-live date</label>
-                  <input type="date" className={input} value={draft.target_go_live || ''} onChange={e => set('target_go_live', e.target.value || null)} /></div>
-                <div><label className={label}>Activation date</label>
-                  <input type="date" className={input} value={draft.activation_date || ''} onChange={e => set('activation_date', e.target.value || null)} /></div>
               </div>
               <div className="mt-3"><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={3} value={draft.notes || ''} onChange={e => set('notes', e.target.value)} /></div>
               <div className="flex gap-2 mt-4">
@@ -204,13 +198,10 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
                 </div>
               </Card>
 
-              <Card title="Key Dates">
+              <Card title="Install Dates">
                 <div className="space-y-3">
-                  <Field label="Onboarding call" value={ob.kickoff_at ? new Date(ob.kickoff_at).toLocaleString('en-US', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : null} />
                   <Field label="Expected install" value={ob.expected_install_date ? new Date(ob.expected_install_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' }) : null} />
                   <Field label="Actual install" value={ob.actual_install_date ? new Date(ob.actual_install_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' }) : null} />
-                  <Field label="Go-live" value={ob.target_go_live ? new Date(ob.target_go_live).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' }) : null} />
-                  <Field label="Activation" value={ob.activation_date ? new Date(ob.activation_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' }) : null} />
                 </div>
               </Card>
 

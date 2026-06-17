@@ -44,7 +44,7 @@ export default function ProjectDetail({ projectId, profile, onClose, onSelectTas
       supabase.from('companies').select('id, name'),
       supabase.from('locations').select('id, name, company_id'),
       supabase.from('deals').select('id, name, company_id'),
-      supabase.from('onboardings').select('id, company_id, stage'),
+      supabase.from('onboardings').select('id, company_id, deal_id, stage'),
     ]);
     setProject(p.data);
     setTasks(t.data || []);
@@ -292,7 +292,7 @@ export default function ProjectDetail({ projectId, profile, onClose, onSelectTas
                   </select>
                 </div>
                 <div>
-                  <label className={label}>Onboarding</label>
+                  <label className={label}>Build Stage</label>
                   <select className={input} value={draft.subject_type === 'onboarding' ? (draft.subject_id || '') : ''} onChange={e => {
                     setDraft(prev => ({
                       ...prev,
@@ -303,7 +303,8 @@ export default function ProjectDetail({ projectId, profile, onClose, onSelectTas
                     <option value="">None</option>
                     {onboardings.map(o => {
                       const co = companies.find(c => c.id === o.company_id);
-                      return <option key={o.id} value={o.id}>{co?.name || '?'} Onboarding</option>;
+                      const dl = deals.find(d => d.id === o.deal_id);
+                      return <option key={o.id} value={o.id}>{dl?.name || co?.name || 'Build Stage'}</option>;
                     })}
                   </select>
                 </div>
