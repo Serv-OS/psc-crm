@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CreditCard, Plus, X, TrendingUp, Banknote } from 'lucide-react';
 import ProcessingAccountDrawer from './ProcessingAccountDrawer.jsx';
+import TwilioBillingCard from './TwilioBillingCard.jsx';
 
 export const gbp0 = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 
@@ -144,6 +145,9 @@ export default function PaymentsPanel({ profile, onNavigate }) {
               </table>
             </div>
           </div>
+
+          {/* Telephony reseller billing */}
+          <TwilioBillingCard profile={profile} />
 
         </div>
       </div>
