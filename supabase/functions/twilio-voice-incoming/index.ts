@@ -74,7 +74,7 @@ serve(async (req) => {
     let callerName = from;
 
     if (variants.length > 0) {
-      const phoneFilter = variants.map(p => `phone.eq.${p}`).join(",");
+      const phoneFilter = variants.flatMap(p => [`phone.eq.${p}`, `mobile.eq.${p}`]).join(",");
       const { data: contacts } = await supabase
         .from("contacts")
         .select("id, first_name, last_name, phone")
@@ -177,6 +177,7 @@ serve(async (req) => {
         subject: `Incoming call from ${callerName}`,
         subject_type: "ticket",
         subject_id: ticketId,
+        contact_id: contactId,
         direction: "inbound",
         message_id: callSid,
         is_internal: false,

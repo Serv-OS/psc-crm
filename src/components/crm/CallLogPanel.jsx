@@ -56,7 +56,18 @@ export default function CallLogPanel({ profile, onNavigate }) {
     const p = people.find(x => x.id === id);
     return p ? (p.display_name || p.email) : null;
   };
-  const contactOf = (a) => contacts.find(c => c.id === a.contact_id);
+  const digits10 = (s) => (s || '').replace(/\D/g, '').slice(-10);
+  // Resolve the contact for a call: by linked contact_id first, else by matching
+  // the call's number (last 10 digits) against contacts' phone/mobile — so calls
+  // logged before contact-linking (or stored in any format) still show the name.
+  const contactOf = (a) => {
+    if (a.contact_id) { const c = contacts.find(x => x.id === a.contact_id); if (c) return c; }
+    const md = a.channel_metadata || {};
+    const num = a.direction === 'inbound' ? md.from_number : (md.to_number || md.from_number);
+    const d = digits10(num);
+    if (d.length === 10) return contacts.find(c => digits10(c.phone) === d || digits10(c.mobile) === d) || null;
+    return null;
+  };
 
   const filtered = useMemo(() => calls.filter(a => {
     if (dirFilter !== 'all' && a.direction !== dirFilter) return false;
@@ -162,7 +173,7 @@ export default function CallLogPanel({ profile, onNavigate }) {
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-paper">
                         {ctName ? (
-                          <button onClick={() => a.contact_id && onNavigate?.('contact', a.contact_id)} className="hover:text-ember transition">{ctName}</button>
+                          <button onClick={() => ct?.id && onNavigate?.('contact', ct.id)} className="hover:text-ember transition">{ctName}</button>
                         ) : (number || 'Unknown number')}
                         {ctName && number && <span className="text-xs text-dim font-normal ml-2">{number}</span>}
                       </div>

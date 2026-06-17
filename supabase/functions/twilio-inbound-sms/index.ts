@@ -55,7 +55,7 @@ serve(async (req) => {
     let companyId: string | null = null;
     let contactName = normalizedFrom;
 
-    const phoneFilter = variants.map(p => `phone.eq.${p}`).join(",");
+    const phoneFilter = variants.flatMap(p => [`phone.eq.${p}`, `mobile.eq.${p}`]).join(",");
     const { data: contacts } = await supabase
       .from("contacts")
       .select("id, first_name, last_name, phone")

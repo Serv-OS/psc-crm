@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { phoneVariants } from "../_shared/phone.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -66,13 +67,23 @@ serve(async (req) => {
 
     // If call was not answered, create a missed call ticket/update
     if (status === "no-answer" || status === "busy") {
-      const from = formData.get("From") as string;
+      const from = (formData.get("From") as string || "").replace(/\s/g, "");
       if (from) {
+        const variants = phoneVariants(from);
+        // Resolve the caller to a contact so the missed call shows their name.
+        let contactId: string | null = null;
+        const { data: cts } = await supabase
+          .from("contacts")
+          .select("id")
+          .or(variants.flatMap(p => [`phone.eq.${p}`, `mobile.eq.${p}`]).join(","))
+          .limit(1);
+        if (cts && cts.length > 0) contactId = cts[0].id;
+
         // Update existing ticket to note the missed call
         const { data: tickets } = await supabase
           .from("tickets")
           .select("id")
-          .eq("customer_phone", from.replace(/\s/g, ""))
+          .or(variants.map(p => `customer_phone.eq.${p}`).join(","))
           .not("stage", "in", '("closed")')
           .limit(1);
 
@@ -83,9 +94,10 @@ serve(async (req) => {
             body: `Customer called but no agent was available (${status})`,
             subject_type: "ticket",
             subject_id: tickets[0].id,
+            contact_id: contactId,
             direction: "inbound",
             is_internal: true,
-            channel_metadata: { status, outcome: status === "busy" ? "busy" : "no_answer" },
+            channel_metadata: { status, outcome: status === "busy" ? "busy" : "no_answer", from_number: from },
           });
         }
       }
