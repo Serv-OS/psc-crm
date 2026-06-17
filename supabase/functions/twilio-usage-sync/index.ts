@@ -104,8 +104,15 @@ Deno.serve(async (req) => {
         twilioGet(sid, authToken, msgsUrl("To")),
       ]);
 
-      const outboundCalls: any[] = outCalls.calls || [];
-      const inboundCalls: any[] = inCalls.calls || [];
+      // Exclude internal browser/WebRTC ("client:") legs — only meter real PSTN
+      // legs. An inbound call routed to the softphone otherwise shows up twice
+      // (the inbound leg + the dial-to-client leg), doubling the count and cost.
+      const isPstn = (c: any) => {
+        const f = String(c.from || ""), t = String(c.to || "");
+        return !f.startsWith("client:") && !t.startsWith("client:");
+      };
+      const outboundCalls: any[] = (outCalls.calls || []).filter(isPstn);
+      const inboundCalls: any[] = (inCalls.calls || []).filter(isPstn);
       const outboundMsgs: any[] = outMsgs.messages || [];
       const inboundMsgs: any[] = inMsgs.messages || [];
 
