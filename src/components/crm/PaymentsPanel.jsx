@@ -80,8 +80,8 @@ export default function PaymentsPanel({ profile, onNavigate }) {
         <div className="flex items-center gap-2.5">
           <CreditCard size={20} className="text-ember" />
           <div>
-            <div className="text-xl font-bold text-paper">Card Processing</div>
-            <div className="text-xs text-muted">Rates, volume processed and our revenue</div>
+            <div className="text-xl font-bold text-paper">Billing &amp; Margins</div>
+            <div className="text-xs text-muted">Card processing and telephony — your cost and what to bill the client</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
