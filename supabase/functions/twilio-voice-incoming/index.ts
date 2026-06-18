@@ -6,7 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { phoneVariants } from "../_shared/phone.ts";
+import { phoneVariants, phoneMatchFilter } from "../_shared/phone.ts";
 
 // Escape text for safe inclusion inside a TwiML <Say>
 const xmlEscape = (s: string) =>
@@ -74,7 +74,7 @@ serve(async (req) => {
     let callerName = from;
 
     if (variants.length > 0) {
-      const phoneFilter = variants.flatMap(p => [`phone.eq.${p}`, `mobile.eq.${p}`]).join(",");
+      const phoneFilter = phoneMatchFilter(["phone"], from);
       const { data: contacts } = await supabase
         .from("contacts")
         .select("id, first_name, last_name, phone")
@@ -117,7 +117,7 @@ serve(async (req) => {
 
     if (normalizedFrom) {
       // Search for open tickets matching any phone variant
-      const ticketPhoneFilter = variants.map(p => `customer_phone.eq.${p}`).join(",");
+      const ticketPhoneFilter = phoneMatchFilter(["customer_phone"], from);
       const { data: openTickets } = await supabase
         .from("tickets")
         .select("id")

@@ -201,21 +201,8 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
             {/* RIGHT: Deals + Onboardings + Projects */}
             <div className="col-span-4 space-y-4">
               <LeadsCard leads={leads} />
-              <Card title="Deals" count={deals.length}>
-                {deals.length > 0 ? (
-                  <div className="space-y-2">
-                    {deals.map(d => (
-                      <div key={d.id} onClick={() => onNavigate?.('deal', d.id)}
-                        className="p-3 glass-inner rounded-xl cursor-pointer">
-                        <div className="text-sm font-medium text-paper">{d.name}</div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-ember font-mono font-bold">{d.value ? `$${Number(d.value).toLocaleString()}` : ''}</span>
-                          <span className="text-[10px] text-muted uppercase">{DEAL_STAGES[d.stage] || d.stage}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <Empty>No deals</Empty>}
+              <Card title="Deals">
+                <AssociationManager subjectType="location" subjectId={locationId} targetType="deal" profile={profile} onNavigate={onNavigate} />
               </Card>
 
               <InvoicesCard locationId={locationId} profile={profile} onNavigate={onNavigate} />

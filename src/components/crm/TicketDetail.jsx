@@ -74,10 +74,10 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
       matched = (ct.data || []).find(x => x.id === t.data.contact_id) || null;
     }
     if (!matched && (t.data?.customer_phone || t.data?.customer_email)) {
-      const variants = phoneVariants(t.data?.customer_phone);
+      const d10 = (t.data?.customer_phone || '').replace(/\D/g, '').slice(-10);
       matched = (ct.data || []).find(x =>
         (t.data.customer_email && x.email && x.email.toLowerCase() === t.data.customer_email.toLowerCase()) ||
-        (x.phone && variants.includes(x.phone.replace(/\s/g, '')))
+        (d10.length === 10 && x.phone && x.phone.replace(/\D/g, '').slice(-10) === d10)
       ) || null;
     }
     setMatchedContact(matched);
@@ -267,8 +267,6 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
                     <option value="support">Support</option><option value="bug">Bug</option><option value="feature_request">Feature Request</option><option value="billing">Billing</option><option value="other">Other</option></select></div>
                   <div><label className={label}>Owner</label><select className={input} value={draft.owner_id || ''} onChange={e => set('owner_id', e.target.value || null)}>
                     <option value="">Unassigned</option>{members.map(m => <option key={m.id} value={m.id}>{m.display_name || m.email}</option>)}</select></div>
-                  <div><label className={label}>Company</label><select className={input} value={draft.company_id} onChange={e => set('company_id', e.target.value)}>
-                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                   <div><label className={label}>Channel</label><select className={input} value={draft.channel || ''} onChange={e => set('channel', e.target.value || null)}>
                     <option value="">Not set</option><option value="email">Email</option><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="phone">Phone</option><option value="web">Web</option></select></div>
                   <div><label className={label}>Customer email</label><input className={input} value={draft.customer_email || ''} onChange={e => set('customer_email', e.target.value)} placeholder="customer@example.com" /></div>
@@ -412,7 +410,7 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
             <div className="lg:col-span-6 space-y-5 order-1 lg:order-2">
               <Card title="Conversation" noPadding>
                 <div className="h-[660px]">
-                  <ConversationTimeline subjectType="ticket" subjectId={ticketId} profile={profile} contacts={[]} ticket={ticket} />
+                  <ConversationTimeline subjectType="ticket" subjectId={ticketId} profile={profile} contacts={contacts} ticket={ticket} />
                 </div>
               </Card>
 
@@ -423,31 +421,8 @@ export default function TicketDetail({ ticketId, profile, onClose, onNavigate })
 
             {/* RIGHT: Company, Locations, Attachments, Projects, History */}
             <div className="lg:col-span-3 space-y-5 order-3">
-              <Card title="Company">
-                {company ? (
-                  <div onClick={() => onNavigate?.('company', company.id)}
-                    className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-ember/15 border border-ember/25 flex items-center justify-center text-lg shrink-0">{'\u{1F3E2}'}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-base font-semibold text-paper">{company.name}</div>
-                      <div className="text-xs text-muted">Company</div>
-                    </div>
-                  </div>
-                ) : <Empty>No company</Empty>}
-              </Card>
-
-              <Card title="Locations" count={companyLocations.length}>
-                {companyLocations.length > 0 ? (
-                  <div className="space-y-2">
-                    {companyLocations.map(l => (
-                      <div key={l.id} onClick={() => onNavigate?.('location', l.id)}
-                        className="p-3 glass-inner rounded-xl cursor-pointer">
-                        <div className="text-sm font-medium text-paper">{l.name}</div>
-                        <div className="text-xs text-muted">{[l.venue_type, l.city].filter(Boolean).join(' / ')}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <Empty>No locations</Empty>}
+              <Card title="Locations">
+                <AssociationManager subjectType="ticket" subjectId={ticketId} targetType="location" profile={profile} onNavigate={onNavigate} />
               </Card>
 
               <AttachmentsCard subjectType="ticket" subjectId={ticketId} profile={profile} />

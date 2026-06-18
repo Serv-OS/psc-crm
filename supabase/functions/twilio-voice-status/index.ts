@@ -4,7 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { phoneVariants } from "../_shared/phone.ts";
+import { phoneMatchFilter } from "../_shared/phone.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -69,13 +69,12 @@ serve(async (req) => {
     if (status === "no-answer" || status === "busy") {
       const from = (formData.get("From") as string || "").replace(/\s/g, "");
       if (from) {
-        const variants = phoneVariants(from);
         // Resolve the caller to a contact so the missed call shows their name.
         let contactId: string | null = null;
         const { data: cts } = await supabase
           .from("contacts")
           .select("id")
-          .or(variants.flatMap(p => [`phone.eq.${p}`, `mobile.eq.${p}`]).join(","))
+          .or(phoneMatchFilter(["phone"], from))
           .limit(1);
         if (cts && cts.length > 0) contactId = cts[0].id;
 
@@ -83,7 +82,7 @@ serve(async (req) => {
         const { data: tickets } = await supabase
           .from("tickets")
           .select("id")
-          .or(variants.map(p => `customer_phone.eq.${p}`).join(","))
+          .or(phoneMatchFilter(["customer_phone"], from))
           .not("stage", "in", '("closed")')
           .limit(1);
 

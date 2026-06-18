@@ -93,11 +93,11 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
 
   const create = async (e) => {
     e.preventDefault();
-    if (!subject.trim() || !companyId) return;
+    if (!subject.trim()) return;
     const { data } = await supabase.from('tickets').insert({
       subject: subject.trim(),
       description: description.trim() || null,
-      company_id: companyId,
+      company_id: companyId || null,
       priority, ticket_type: ticketType, owner_id: profile.id,
     }).select().single();
     if (data) {
@@ -151,24 +151,12 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
             <input className={input} value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ticket subject" autoFocus />
             <textarea className={input + ' resize-none'} rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)" />
             <div className="flex gap-2 items-center flex-wrap">
-              <select className={input + ' w-56'} value={newLocation} onChange={e => handleLocationChange(e.target.value)}>
-                <option value="">Select location...</option>
-                {locations.map(l => {
-                  const co = companies.find(c => c.id === l.company_id);
-                  return <option key={l.id} value={l.id}>{l.name} ({co?.name || '?'})</option>;
-                })}
+              <select className={input + ' w-56'} value={newLocation} onChange={e => setNewLocation(e.target.value)}>
+                <option value="">Link a location (optional)…</option>
+                {locations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
               </select>
-              {companyId && (
-                <span className="px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 flex items-center gap-1.5">
-                  {'\u{1F3E2}'} {companies.find(c => c.id === companyId)?.name || ''}
-                </span>
-              )}
-              {!newLocation && (
-                <select className={input + ' w-44'} value={companyId} onChange={e => setCompanyId(e.target.value)}>
-                  <option value="">Or company...</option>
-                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              )}
               <select className={input + ' w-24'} value={priority} onChange={e => setPriority(e.target.value)}>
                 <option value="P0">P0</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option>
               </select>
@@ -195,7 +183,6 @@ export default function TicketList({ profile, onSelect, onNavigate }) {
               badge={<span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${STAGE_STYLES[t.stage]}`}>{STAGE_LABELS[t.stage] || t.stage}</span>}
             />
             <ChipRow>
-              <Chip tone="slate" icon={'\u{1F3E2}'}>{companyName(t.company_id)}</Chip>
               <span className={`inline-flex items-center px-2 py-1 text-xs font-bold rounded-lg bg-card border border-bdr ${PRIORITY_STYLES[t.priority]}`}>{t.priority}</span>
               {awaitingReply(t) && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-lg bg-amber-100 text-amber-700 border border-amber-200 animate-pulse">

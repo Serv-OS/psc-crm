@@ -38,6 +38,22 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
+  const digits10 = (s) => (s || '').replace(/\D/g, '').slice(-10);
+  // Resolve an inbound message's sender to a saved contact name — by the ticket's
+  // linked contact, else by matching the number's last 10 digits — else the number.
+  const customerName = (a) => {
+    const md = a.channel_metadata || {};
+    const num = md.from_number || md.from || ticket?.customer_phone || '';
+    const tc = contacts?.find(c => c.id === ticket?.contact_id);
+    if (tc) return [tc.first_name, tc.last_name].filter(Boolean).join(' ') || tc.email || num || 'Customer';
+    const d = digits10(num);
+    if (d.length === 10) {
+      const c = contacts?.find(x => digits10(x.phone) === d);
+      if (c) return [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || num;
+    }
+    return num || 'Customer';
+  };
+
   useEffect(() => {
     load();
     // Live conversation: reload when any message lands on this record
@@ -356,7 +372,7 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
                     <div className={`rounded-2xl p-3 w-full ${isVoicemail ? 'bg-amber-50 border border-amber-200' : 'glass-card'}`}>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-base">{isVoicemail ? '\u{1F4FC}' : TYPE_ICON.call}</span>
-                        <span className="text-xs font-medium text-paper">{a.actor_id ? getName(a.actor_id) : (md.from_number || 'Customer')}</span>
+                        <span className="text-xs font-medium text-paper">{a.actor_id ? getName(a.actor_id) : customerName(a)}</span>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isVoicemail ? 'bg-amber-100 text-amber-700' : a.direction === 'inbound' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                           {isVoicemail ? 'Voicemail' : `${a.direction === 'inbound' ? 'Inbound' : 'Outbound'} Call`}
                         </span>
@@ -386,7 +402,7 @@ export default function ConversationTimeline({ subjectType, subjectId, profile, 
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="text-sm">{TYPE_ICON[a.type]}</span>
                       <span className="text-xs font-medium text-paper">
-                        {isAgent ? getName(a.actor_id) : (a.channel_metadata?.from || a.channel_metadata?.from_number || 'Customer')}
+                        {isAgent ? getName(a.actor_id) : customerName(a)}
                       </span>
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
                         isOutbound ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'

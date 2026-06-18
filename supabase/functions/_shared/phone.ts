@@ -43,3 +43,20 @@ export function phoneVariants(input: string | null | undefined): string[] {
 
   return [...set];
 }
+
+// Last 10 digits of a number — the stable key for matching across formats.
+// Used for a `like.*<last10>` filter, which matches "+16503985153",
+// "16503985153" and "6503985153" alike WITHOUT a literal "+" (PostgREST
+// mangles "+" inside an .or() string, so phone.eq.+1... never matches).
+export function last10(input: string | null | undefined): string {
+  return (input || "").replace(/\D/g, "").slice(-10);
+}
+
+// PostgREST .or() filter that matches any of the given columns ending in the
+// caller's last 10 digits. Falls back to exact-variant matching for short
+// inputs (e.g. short codes) that don't have 10 digits.
+export function phoneMatchFilter(cols: string[], input: string | null | undefined): string {
+  const d = last10(input);
+  if (d.length >= 7) return cols.map((c) => `${c}.like.*${d}`).join(",");
+  return phoneVariants(input).flatMap((p) => cols.map((c) => `${c}.eq.${p}`)).join(",");
+}

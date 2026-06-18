@@ -36,7 +36,7 @@ export default function CallLogPanel({ profile, onNavigate }) {
       supabase.from('crm_activities').select('*').eq('type', 'call')
         .order('occurred_at', { ascending: false }).limit(1000),
       supabase.from('profiles').select('id, email, display_name'),
-      supabase.from('contacts').select('id, first_name, last_name, phone, mobile'),
+      supabase.from('contacts').select('id, first_name, last_name, phone'),
     ]);
     setCalls(a.data || []); setPeople(p.data || []); setContacts(c.data || []);
     setLoading(false);
@@ -65,7 +65,7 @@ export default function CallLogPanel({ profile, onNavigate }) {
     const md = a.channel_metadata || {};
     const num = a.direction === 'inbound' ? md.from_number : (md.to_number || md.from_number);
     const d = digits10(num);
-    if (d.length === 10) return contacts.find(c => digits10(c.phone) === d || digits10(c.mobile) === d) || null;
+    if (d.length === 10) return contacts.find(c => digits10(c.phone) === d) || null;
     return null;
   };
 
@@ -78,7 +78,7 @@ export default function CallLogPanel({ profile, onNavigate }) {
     if (search.trim()) {
       const md = a.channel_metadata || {};
       const ct = contactOf(a);
-      const hay = [md.from_number, md.to_number, ct?.first_name, ct?.last_name, ct?.phone, ct?.mobile,
+      const hay = [md.from_number, md.to_number, ct?.first_name, ct?.last_name, ct?.phone,
         agentName(a.actor_id), a.body].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(search.trim().toLowerCase())) return false;
     }

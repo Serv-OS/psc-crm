@@ -6,7 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { phoneVariants } from "../_shared/phone.ts";
+import { phoneMatchFilter } from "../_shared/phone.ts";
 
 serve(async (req) => {
   // Twilio sends webhooks as POST with form-urlencoded body
@@ -47,15 +47,13 @@ serve(async (req) => {
       return twimlResponse(""); // Already processed, return empty TwiML
     }
 
-    // Generate all phone variants for matching (US + UK)
-    const variants = phoneVariants(normalizedFrom);
-
     // Try to match sender to a contact by phone number
     let contactId: string | null = null;
     let companyId: string | null = null;
     let contactName = normalizedFrom;
 
-    const phoneFilter = variants.flatMap(p => [`phone.eq.${p}`, `mobile.eq.${p}`]).join(",");
+    // Match on the last 10 digits (handles +1 E.164 vs bare 10-digit storage).
+    const phoneFilter = phoneMatchFilter(["phone"], normalizedFrom);
     const { data: contacts } = await supabase
       .from("contacts")
       .select("id, first_name, last_name, phone")
