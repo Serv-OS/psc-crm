@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import TimerButton from './TimerButton.jsx';
 import AssociationManager from './AssociationManager.jsx';
 import ActivityTimeline from './ActivityTimeline.jsx';
 import { BUILD_STAGE_KEYS as STAGES, BUILD_STAGE_LABELS as STAGE_LABELS } from '../../lib/buildStages';
@@ -112,6 +113,7 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
             )}
           </div>
         </div>
+        {!editing && <TimerButton subjectType="onboarding" subjectId={onboardingId} label={deal?.name || company?.name || 'Build Stage'} profile={profile} />}
         {canWrite && !editing && (
           <div className="flex gap-2">
             <button onClick={startEdit} className="btn-ghost px-4 py-2 rounded-xl text-sm">Edit</button>
