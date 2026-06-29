@@ -7,8 +7,6 @@ import { BUILD_STAGE_KEYS as STAGES, BUILD_STAGE_LABELS as STAGE_LABELS } from '
 
 export default function OnboardingDetail({ onboardingId, profile, onClose, onNavigate }) {
   const [ob, setOb] = useState(null);
-  const [company, setCompany] = useState(null);
-  const [locations, setLocations] = useState([]);
   const [members, setMembers] = useState([]);
   const [history, setHistory] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -31,14 +29,6 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
     setMembers(m.data || []);
     setHistory(h.data || []);
     setProjects(prj.data || []);
-    if (o.data?.company_id) {
-      const [c, l] = await Promise.all([
-        supabase.from('companies').select('*').eq('id', o.data.company_id).single(),
-        supabase.from('locations').select('*').eq('company_id', o.data.company_id).order('name'),
-      ]);
-      setCompany(c.data);
-      setLocations(l.data || []);
-    }
     if (o.data?.deal_id) {
       const { data: d } = await supabase.from('deals').select('*').eq('id', o.data.deal_id).single();
       setDeal(d);
@@ -77,13 +67,13 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
   };
 
   const createLinkedProject = async () => {
-    const name = prompt(`Project name for ${deal?.name || company?.name || 'this'} build stage:`);
+    const name = prompt(`Project name for ${deal?.name || 'this'} build stage:`);
     if (!name?.trim()) return;
-    const { data } = await supabase.from('crm_projects').insert({
+    const { data, error } = await supabase.from('crm_projects').insert({
       name: name.trim(), subject_type: 'onboarding', subject_id: onboardingId, owner_id: profile.id,
     }).select().single();
-    if (data) onNavigate?.('project', data.id);
-    else load();
+    if (error || !data) { alert('Could not create project: ' + (error?.message || 'unknown error')); return; }
+    setProjects(p => [data, ...p]);   // show it on the build stage immediately
   };
 
   if (!ob) return <div className="h-full flex items-center justify-center text-dim text-sm">Loading...</div>;
@@ -100,20 +90,14 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
         <button onClick={onClose} className="text-muted hover:text-paper text-lg">&larr;</button>
         <div className="flex-1 min-w-0">
           <div className="text-xl font-bold text-paper truncate">
-            {deal?.name || locations.find(l => l.id === ob.location_id)?.name || company?.name || 'Build Stage'}
+            {deal?.name || 'Build Stage'}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="badge-status bg-orange-100 text-orange-700 border border-orange-200">{STAGE_LABELS[ob.stage]}</span>
             <span className="text-xs text-muted">Owner: {ownerName(ob.owner_id)}</span>
-            {company && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-lg bg-slate-100 text-slate-600 border border-slate-200 cursor-pointer hover:border-slate-300"
-                onClick={() => onNavigate?.('company', company.id)}>
-                {'\u{1F3E2}'} {company.name}
-              </span>
-            )}
           </div>
         </div>
-        {!editing && <TimerButton subjectType="onboarding" subjectId={onboardingId} label={deal?.name || company?.name || 'Build Stage'} profile={profile} />}
+        {!editing && <TimerButton subjectType="onboarding" subjectId={onboardingId} label={deal?.name || 'Build Stage'} profile={profile} />}
         {canWrite && !editing && (
           <div className="flex gap-2">
             <button onClick={startEdit} className="btn-ghost px-4 py-2 rounded-xl text-sm">Edit</button>
@@ -178,7 +162,7 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
         ) : (
           <div className="grid grid-cols-12 gap-4 max-w-[1400px]">
 
-            {/* LEFT: Key Info + Company + Locations */}
+            {/* LEFT: Key Info + Install Dates + From Deal */}
             <div className="col-span-4 space-y-4">
               <Card title="Key Info">
                 <div className="space-y-3">
@@ -196,33 +180,6 @@ export default function OnboardingDetail({ onboardingId, profile, onClose, onNav
                   <Field label="Demo/Install start" value={ob.demo_install_start_date ? new Date(ob.demo_install_start_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' }) : null} />
                   <Field label="Expected completion" value={ob.expected_completion_date ? new Date(ob.expected_completion_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' }) : null} />
                 </div>
-              </Card>
-
-              <Card title="Company">
-                {company ? (
-                  <div onClick={() => onNavigate?.('company', company.id)}
-                    className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-ember/15 border border-ember/25 flex items-center justify-center text-lg shrink-0">{'\u{1F3E2}'}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-base font-semibold text-paper">{company.name}</div>
-                      <div className="text-xs text-muted">{company.domain || company.industry || 'Company'}</div>
-                    </div>
-                  </div>
-                ) : <Empty>No company</Empty>}
-              </Card>
-
-              <Card title="Locations" count={locations.length}>
-                {locations.length > 0 ? (
-                  <div className="space-y-2">
-                    {locations.map(l => (
-                      <div key={l.id} onClick={() => onNavigate?.('location', l.id)}
-                        className="p-3 glass-inner rounded-xl cursor-pointer">
-                        <div className="text-sm font-medium text-paper">{l.name}</div>
-                        <div className="text-xs text-muted">{[l.venue_type, l.city].filter(Boolean).join(' / ')}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <Empty>No locations</Empty>}
               </Card>
 
               {deal && (
