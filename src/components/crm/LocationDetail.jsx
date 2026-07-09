@@ -24,6 +24,7 @@ const STATUS_COLORS = {
 export default function LocationDetail({ locationId, profile, onClose, onNavigate, onCreateLead }) {
   const [location, setLocation] = useState(null);
   const [company, setCompany] = useState(null);
+  const [companies, setCompanies] = useState([]);
   const [deals, setDeals] = useState([]);
   const [onboardings, setOnboardings] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -48,6 +49,7 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
       supabase.from('leads').select('*').eq('location_id', locationId).order('created_at', { ascending: false }),
     ]);
     setLocation(l.data);
+    supabase.from('companies').select('id, name').order('name').then(r => setCompanies(r.data || []));
     setMembers(m.data || []);
     setModules(mods.data || []);
     setLocationModules(lm.data || []);
@@ -79,6 +81,13 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
     if (!confirm(`Unlink "${location?.name}" from ${company?.name || 'this company'}?\n\nThe location and its history stay — only the company link is removed.`)) return;
     const { error } = await supabase.from('locations').update({ company_id: null }).eq('id', locationId);
     if (error) { alert('Could not unlink: ' + error.message); return; }
+    load();
+  };
+
+  // Assign (or reassign) this location to a company (e.g. new owner).
+  const linkCompany = async (cid) => {
+    const { error } = await supabase.from('locations').update({ company_id: cid }).eq('id', locationId);
+    if (error) { alert('Could not link: ' + error.message); return; }
     load();
   };
 
@@ -123,7 +132,7 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
             {primaryLead(leads) && <LeadBadge stage={primaryLead(leads).stage} full />}
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {location.company_id && (
+            {location.company_id ? (
               <span className="badge-company inline-flex items-center gap-1.5">
                 <span className="cursor-pointer" onClick={() => onNavigate?.('company', location.company_id)}>
                   {'\u{1F3E2}'} {company?.name || 'Unknown company'}
@@ -133,7 +142,13 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
                     className="text-red-500 hover:text-red-700 font-bold leading-none">×</button>
                 )}
               </span>
-            )}
+            ) : canWrite ? (
+              <select value="" onChange={e => e.target.value && linkCompany(e.target.value)}
+                className="text-xs px-2 py-1 bg-card border border-bdr rounded-lg text-paper focus:outline-none focus:border-ember">
+                <option value="">+ Link a company...</option>
+                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            ) : null}
             {location.venue_type && <span className="text-xs text-muted">{propertyTypeLabel(location.venue_type)}</span>}
             {location.covers && <span className="text-xs text-muted">{location.covers} covers</span>}
           </div>
