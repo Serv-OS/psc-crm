@@ -7,6 +7,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { graph, msTokenFromRefresh } from "../_shared/microsoft.ts";
+import { isOpenNow } from "../_shared/hours.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -109,16 +110,20 @@ serve(async (req) => {
           // Auto-reply on first contact only (threaded reply via Graph).
           try {
             const { data: vs } = await supabase.from("support_settings")
-              .select("auto_reply_email_enabled, auto_reply_email_subject, auto_reply_email_message").eq("id", 1).single();
+              .select("auto_reply_email_enabled, auto_reply_email_subject, auto_reply_email_message, after_hours_email_subject, after_hours_email_message, business_hours_enabled, business_timezone, business_hours").eq("id", 1).single();
             if (vs?.auto_reply_email_enabled) {
-              const replyBody = (vs.auto_reply_email_message || "")
+              // Out of hours (if hours are configured + an after-hours message is set), send that instead.
+              const afterHours = !isOpenNow(vs) && !!(vs.after_hours_email_message || "").trim();
+              const tmpl = afterHours ? vs.after_hours_email_message : vs.auto_reply_email_message;
+              const subj = afterHours ? (vs.after_hours_email_subject || vs.auto_reply_email_subject) : vs.auto_reply_email_subject;
+              const replyBody = (tmpl || "")
                 .replace(/\{\{\s*contact_name\s*\}\}/g, senderName || "there")
                 .replace(/\{\{\s*ticket_number\s*\}\}/g, nt.ticket_number ? `#${nt.ticket_number}` : "");
               await graph(accessToken, `/me/messages/${m.id}/reply`, { method: "POST", body: JSON.stringify({ comment: replyBody }) });
               await supabase.from("crm_activities").insert({
-                type: "email", subject: vs.auto_reply_email_subject || `Re: ${subject}`, body: replyBody,
+                type: "email", subject: subj || `Re: ${subject}`, body: replyBody,
                 subject_type: "ticket", subject_id: ticketId, direction: "outbound", is_internal: false,
-                thread_id: conversationId, channel_metadata: { auto_reply: true, to: senderEmail },
+                thread_id: conversationId, channel_metadata: { auto_reply: true, after_hours: afterHours, to: senderEmail },
               });
             }
           } catch (e) { console.error("MS auto-reply failed:", (e as Error).message); }
