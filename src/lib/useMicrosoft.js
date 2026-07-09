@@ -19,9 +19,14 @@ export function clearMicrosoftConfigCache() { _cfg = null; }
 /** Open the Microsoft OAuth popup. personal=true connects the signed-in user's
  *  own Outlook; personal=false connects the shared support mailbox. */
 export async function connectMicrosoft(personal = false) {
+  // Open the popup synchronously (inside the click gesture) BEFORE any await, or
+  // the browser blocks it as an unsolicited popup. We point it at the auth URL
+  // once the async session/config work resolves.
+  const w = 520, h = 680;
+  const popup = window.open('', 'ms-oauth', `width=${w},height=${h},left=${(screen.width - w) / 2},top=${(screen.height - h) / 2}`);
   const { data: { session } } = await supabase.auth.getSession();
   const { clientId, tenant } = await getMicrosoftConfig();
-  if (!clientId) { alert('Add your Microsoft Application (client) ID in Settings first.'); return; }
+  if (!clientId) { popup?.close(); alert('Add your Microsoft Application (client) ID in Settings first.'); return; }
   const state = (personal ? 'personal:' : '') + (session?.access_token || '');
   const url = `https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/authorize?` +
     `client_id=${encodeURIComponent(clientId)}` +
@@ -30,8 +35,7 @@ export async function connectMicrosoft(personal = false) {
     `&scope=${encodeURIComponent(SCOPES)}` +
     `&prompt=select_account` +
     `&state=${encodeURIComponent(state)}`;
-  const w = 520, h = 680;
-  window.open(url, 'ms-oauth', `width=${w},height=${h},left=${(screen.width - w) / 2},top=${(screen.height - h) / 2}`);
+  if (popup) popup.location.href = url; else window.location.href = url;
 }
 
 /** Per-user personal Outlook connection status. */
