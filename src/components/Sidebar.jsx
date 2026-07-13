@@ -34,7 +34,7 @@ const COLLAPSIBLE = [
   ] },
   { id: 'insights', label: 'Insights', items: [
     ['reporting', 'Reporting', BarChart3], ['sales_performance', 'Sales Performance', TrendingUp],
-    ['processing', 'Billing & Margins', CreditCard],
+    ['processing', 'Billing & Margins', CreditCard], ['finance_reports', 'Finance', BarChart3],
   ] },
 ];
 

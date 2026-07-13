@@ -7,6 +7,7 @@ import TimerWidget from './TimerWidget.jsx';
 import TimePanel from './crm/TimePanel.jsx';
 import PaymentsPanel from './crm/PaymentsPanel.jsx';
 import InvoicesPanel from './crm/InvoicesPanel.jsx';
+import ReportsPanel from './crm/ReportsPanel.jsx';
 import QuotesPanel from './crm/QuotesPanel.jsx';
 import CallLogPanel from './crm/CallLogPanel.jsx';
 import SalesPerformance from './crm/SalesPerformance.jsx';
@@ -217,6 +218,8 @@ export default function Shell({ session }) {
         return <CallLogPanel profile={profile} onNavigate={navigateTo} />;
       case 'invoices':
         return <InvoicesPanel profile={profile} onNavigate={navigateTo} />;
+      case 'finance_reports':
+        return <ReportsPanel profile={profile} onNavigate={navigateTo} />;
       case 'invoice_detail':
         return <InvoiceBuilder invoiceId={detailId} profile={profile} onClose={() => setView('invoices')} onNavigate={navigateTo} />;
       case 'schedule':
