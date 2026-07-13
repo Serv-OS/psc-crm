@@ -7,7 +7,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendInvoiceEmail } from "../_shared/invoiceEmail.ts";
+import { sendSupportEmail } from "../_shared/supportEmail.ts";
 
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
@@ -199,7 +199,7 @@ serve(async (req) => {
   <a href="${appUrl}" style="display:inline-block;background:#15C26A;color:#fff;font-weight:600;font-size:14px;padding:10px 22px;border-radius:8px;text-decoration:none">Open CRM</a>
   <div style="font-size:11px;color:#999;margin-top:20px">You can change notification preferences in your account settings.</div>
 </div>`;
-        await sendInvoiceEmail(supabase, p.email, n.title || "CRM notification", html);
+        await sendSupportEmail(supabase, p.email, n.title || "CRM notification", html);
         updates.emailed_at = new Date().toISOString();
         results.email = "sent";
       } catch (e) { results.email = "failed: " + (e as Error).message; }
