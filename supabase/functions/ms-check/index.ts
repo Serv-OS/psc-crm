@@ -132,12 +132,14 @@ serve(async (req) => {
 
       // Log the inbound email as an activity.
       if (ticketId) {
-        const bodyText = m.body?.contentType === "html" ? stripHtml(m.body?.content || "") : (m.body?.content || "");
+        const isHtml = m.body?.contentType === "html";
+        const rawHtml = isHtml ? (m.body?.content || "") : null;
+        const bodyText = isHtml ? stripHtml(m.body?.content || "") : (m.body?.content || "");
         await supabase.from("crm_activities").insert({
           type: "email", subject, body: bodyText.slice(0, 10000),
           subject_type: "ticket", subject_id: ticketId, direction: "inbound", contact_id: contactId,
           message_id: messageId, thread_id: conversationId, is_internal: false,
-          channel_metadata: { from: senderEmail, ms_message_id: m.id, conversation_id: conversationId },
+          channel_metadata: { from: senderEmail, ms_message_id: m.id, conversation_id: conversationId, ...(rawHtml ? { html: rawHtml.slice(0, 200000) } : {}) },
           occurred_at: m.receivedDateTime ? new Date(m.receivedDateTime).toISOString() : new Date().toISOString(),
         });
         processed++;
