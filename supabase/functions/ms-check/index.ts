@@ -8,6 +8,28 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { graph, msTokenFromRefresh } from "../_shared/microsoft.ts";
 import { isOpenNow } from "../_shared/hours.ts";
+import { b64ToBytes, storeAttachment } from "../_shared/attachments.ts";
+
+// Fetch a message's real file attachments via Graph, skipping tiny inline images
+// (signature logos / tracking pixels). Falls back to /$value when the collection
+// omits contentBytes for a large file.
+async function fetchMsAttachments(accessToken: string, msgId: string): Promise<{ name: string; mime: string; bytes: Uint8Array }[]> {
+  const list = await graph(accessToken, `/me/messages/${msgId}/attachments?$select=id,name,contentType,size,isInline,contentBytes`) as { value?: any[] };
+  const out: { name: string; mime: string; bytes: Uint8Array }[] = [];
+  for (const a of (list?.value || [])) {
+    if (!String(a["@odata.type"] || "").includes("fileAttachment")) continue; // skip item/reference attachments
+    const mime = a.contentType || "application/octet-stream";
+    const isImage = mime.startsWith("image/");
+    if (a.isInline && isImage && (a.size || 0) < 12000) continue; // skip signature/pixel images
+    let bytes: Uint8Array | null = a.contentBytes ? b64ToBytes(a.contentBytes) : null;
+    if (!bytes) {
+      const raw = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${msgId}/attachments/${a.id}/$value`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (raw.ok) bytes = new Uint8Array(await raw.arrayBuffer());
+    }
+    if (bytes?.length) out.push({ name: a.name || "file", mime, bytes });
+  }
+  return out;
+}
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -58,7 +80,7 @@ serve(async (req) => {
     const since = new Date(sinceMs - 5 * 60 * 1000).toISOString();
     const runStarted = new Date().toISOString();
     const path = `/me/mailFolders/inbox/messages?$filter=receivedDateTime ge ${since}` +
-      `&$orderby=receivedDateTime desc&$top=30&$select=id,internetMessageId,conversationId,subject,from,receivedDateTime,body`;
+      `&$orderby=receivedDateTime desc&$top=30&$select=id,internetMessageId,conversationId,subject,from,receivedDateTime,body,hasAttachments`;
     const list = await graph(accessToken, path) as { value?: any[] };
     const messages = list?.value || [];
     let processed = 0;
@@ -135,13 +157,26 @@ serve(async (req) => {
         const isHtml = m.body?.contentType === "html";
         const rawHtml = isHtml ? (m.body?.content || "") : null;
         const bodyText = isHtml ? stripHtml(m.body?.content || "") : (m.body?.content || "");
-        await supabase.from("crm_activities").insert({
+        const { data: inboundAct } = await supabase.from("crm_activities").insert({
           type: "email", subject, body: bodyText.slice(0, 10000),
           subject_type: "ticket", subject_id: ticketId, direction: "inbound", contact_id: contactId,
           message_id: messageId, thread_id: conversationId, is_internal: false,
           channel_metadata: { from: senderEmail, ms_message_id: m.id, conversation_id: conversationId, ...(rawHtml ? { html: rawHtml.slice(0, 200000) } : {}) },
           occurred_at: m.receivedDateTime ? new Date(m.receivedDateTime).toISOString() : new Date().toISOString(),
-        });
+        }).select("id").single();
+
+        // Store any email attachments (screenshots, photos, PDFs) against the ticket.
+        if (m.hasAttachments) {
+          try {
+            const atts = await fetchMsAttachments(accessToken, m.id);
+            for (const a of atts) {
+              await storeAttachment(supabase, {
+                ticketId, activityId: inboundAct?.id || null,
+                name: a.name, mime: a.mime, bytes: a.bytes, source: "inbound_email",
+              });
+            }
+          } catch (e) { console.error("MS attachment store failed:", (e as Error).message); }
+        }
         processed++;
       }
     }

@@ -6,6 +6,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { graph, msTokenFromRefresh } from "../_shared/microsoft.ts";
+import { bytesToB64, loadAttachmentsForSend, storeAttachment } from "../_shared/attachments.ts";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
@@ -19,8 +20,14 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(auth);
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { ticket_id, to, subject, body, cc } = await req.json();
+    const { ticket_id, to, subject, body, cc, attachments } = await req.json();
     if (!ticket_id || !to || !body) return json({ error: "Missing ticket_id, to or body" }, 400);
+
+    // Pull any composer-uploaded files out of storage → Graph file attachments.
+    const outAtts = await loadAttachmentsForSend(supabase, Array.isArray(attachments) ? attachments : []);
+    const graphAtts = outAtts.map((a) => ({
+      "@odata.type": "#microsoft.graph.fileAttachment", name: a.name, contentType: a.mime, contentBytes: bytesToB64(a.bytes),
+    }));
 
     // Connected support mailbox → fresh access token (persist rotated refresh token).
     const { data: conn } = await supabase.from("microsoft_connections")
@@ -51,14 +58,14 @@ serve(async (req) => {
       // Threaded reply onto the original message.
       await graph(accessToken, `/me/messages/${srcMsgId}/reply`, {
         method: "POST",
-        body: JSON.stringify({ message: { toRecipients: recipients, ccRecipients }, comment: body }),
+        body: JSON.stringify({ message: { toRecipients: recipients, ccRecipients, ...(graphAtts.length ? { attachments: graphAtts } : {}) }, comment: body }),
       });
     } else {
       // No prior inbound — start a fresh message.
       await graph(accessToken, `/me/sendMail`, {
         method: "POST",
         body: JSON.stringify({
-          message: { subject: emailSubject, body: { contentType: "Text", content: body }, toRecipients: recipients, ccRecipients },
+          message: { subject: emailSubject, body: { contentType: "Text", content: body }, toRecipients: recipients, ccRecipients, ...(graphAtts.length ? { attachments: graphAtts } : {}) },
           saveToSentItems: true,
         }),
       });
@@ -70,6 +77,14 @@ serve(async (req) => {
       direction: "outbound", actor_id: user.id, message_id: newMessageId, thread_id: conversationId,
       is_internal: false, channel_metadata: { to, cc: cc || null, from: conn.email },
     }).select().single();
+
+    // Record sent attachments against the new activity so they show on the ticket.
+    for (const a of outAtts) {
+      await storeAttachment(supabase, {
+        ticketId: ticket_id, activityId: activity?.id || null,
+        name: a.name, mime: a.mime, bytes: a.bytes, source: "outbound_email", uploadedBy: user.id,
+      });
+    }
 
     if (ticket?.stage === "new") {
       await supabase.from("tickets").update({ stage: "waiting_on_customer" }).eq("id", ticket_id);
