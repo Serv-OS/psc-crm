@@ -30,6 +30,7 @@ const COLLAPSIBLE = [
   ] },
   { id: 'delivery', label: 'Delivery', items: [
     ['onboarding', 'Build Stages', Rocket], ['projects', 'Projects', Folder], ['tasks', 'Tasks', CheckSquare],
+    ['project_templates', 'Project templates', Layers],
   ] },
   { id: 'support', label: 'Support', items: [
     ['tickets', 'Support', Ticket], ['calls', 'Call Log', PhoneCall], ['forms', 'Forms', ClipboardList], ['templates', 'Templates', FileText],
