@@ -141,7 +141,7 @@ serve(async (req) => {
   try {
     const payload = await req.json().catch(() => ({}));
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://psc-crm.vercel.app";
 
     // Test path: Settings "Send test" button -> post a sample to the Chat space.
     if (payload.test_chat) {

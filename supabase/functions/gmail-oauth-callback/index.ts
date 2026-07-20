@@ -12,7 +12,7 @@ serve(async (req) => {
   const state = url.searchParams.get("state"); // contains the user's JWT
   const error = url.searchParams.get("error");
 
-  const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
+  const appUrl = Deno.env.get("APP_URL") || "https://psc-crm.vercel.app";
 
   if (error) {
     return new Response(redirectHtml(appUrl, false, error), {

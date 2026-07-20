@@ -42,7 +42,7 @@ serve(async (req) => {
     const { data: seller } = await supabase.from("support_settings")
       .select("business_name, business_email, business_phone, quote_accent, logo_url").eq("id", 1).maybeSingle();
 
-    const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://psc-crm.vercel.app";
     const link = `${appUrl}/i/${inv.public_token}`;
     const { subject, html } = invoiceEmailHtml(inv, seller || {}, link);
     await sendInvoiceEmail(supabase, recipient, subject, html);

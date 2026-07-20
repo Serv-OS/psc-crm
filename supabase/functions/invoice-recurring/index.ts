@@ -67,7 +67,7 @@ serve(async (req) => {
           try {
             const { data: seller } = await supabase.from("support_settings")
               .select("business_name, business_email, business_phone, quote_accent, logo_url").eq("id", 1).maybeSingle();
-            const appUrl = Deno.env.get("APP_URL") || "https://posupject.vercel.app";
+            const appUrl = Deno.env.get("APP_URL") || "https://psc-crm.vercel.app";
             const { subject, html } = invoiceEmailHtml(inv, seller || {}, `${appUrl}/i/${inv.public_token}`);
 
             // Bill-to parties for the PDF (contact is the customer; company/location shown when linked).
