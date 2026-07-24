@@ -18,6 +18,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
   const [company, setCompany] = useState(null);
   const [location, setLocation] = useState(null);
   const [contact, setContact] = useState(null);
+  const [deal, setDeal] = useState(null);
   const [members, setMembers] = useState([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
@@ -58,6 +59,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
     if (l.data?.company_id) supabase.from('companies').select('id, name, phone, domain').eq('id', l.data.company_id).single().then(r => setCompany(r.data)); else setCompany(null);
     if (l.data?.location_id) supabase.from('locations').select('id, name, phone, city, venue_type').eq('id', l.data.location_id).single().then(r => setLocation(r.data)); else setLocation(null);
     if (l.data?.contact_id) supabase.from('contacts').select('id, first_name, last_name, phone, email').eq('id', l.data.contact_id).single().then(r => setContact(r.data)); else setContact(null);
+    if (l.data?.deal_id) supabase.from('deals').select('*').eq('id', l.data.deal_id).single().then(r => setDeal(r.data)); else setDeal(null);
     if (l.data) { await ensureAssociations(l.data); setReady(true); }
   };
 
@@ -233,6 +235,20 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
             <div className="col-span-4 space-y-4">
               {ready ? (
                 <>
+                  <Card title="Deals">
+                    {deal ? (
+                      <div onClick={() => onNavigate?.('deal', deal.id)} className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-base shrink-0">{'\u{1F4B0}'}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-paper truncate">{deal.name}</div>
+                          <div className="text-[11px] text-muted capitalize">{(deal.stage || '').replace(/_/g, ' ')}{deal.value != null ? ` \u00b7 $${Number(deal.value).toLocaleString()}` : ''}</div>
+                        </div>
+                        <span className="text-dim text-xs">{'\u2192'}</span>
+                      </div>
+                    ) : (
+                      <Empty>No deal yet — qualifying this lead creates one.</Empty>
+                    )}
+                  </Card>
                   <Card title="Contacts">
                     <AssociationManager subjectType="lead" subjectId={leadId} targetType="contact" profile={profile} onNavigate={onNavigate} />
                   </Card>
