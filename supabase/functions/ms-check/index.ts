@@ -8,16 +8,22 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { graph, msTokenFromRefresh } from "../_shared/microsoft.ts";
 import { isOpenNow } from "../_shared/hours.ts";
-import { b64ToBytes, storeAttachment } from "../_shared/attachments.ts";
+import { b64ToBytes, storeAttachment, storeLinkAttachment } from "../_shared/attachments.ts";
 
-// Fetch a message's real file attachments via Graph, skipping tiny inline images
-// (signature logos / tracking pixels). Falls back to /$value when the collection
-// omits contentBytes for a large file.
-async function fetchMsAttachments(accessToken: string, msgId: string): Promise<{ name: string; mime: string; bytes: Uint8Array }[]> {
-  const list = await graph(accessToken, `/me/messages/${msgId}/attachments?$select=id,name,contentType,size,isInline,contentBytes`) as { value?: any[] };
-  const out: { name: string; mime: string; bytes: Uint8Array }[] = [];
+// Fetch a message's attachments via Graph: real files (bytes) AND cloud-link
+// reference attachments (OneDrive/Drive "attached" as a link — no bytes, just
+// a sourceUrl). Skips tiny inline images (signature logos / tracking pixels).
+// Falls back to /$value when the collection omits contentBytes for a large file.
+async function fetchMsAttachments(accessToken: string, msgId: string): Promise<({ name: string; mime: string; bytes: Uint8Array } | { name: string; url: string })[]> {
+  const list = await graph(accessToken, `/me/messages/${msgId}/attachments`) as { value?: any[] };
+  const out: ({ name: string; mime: string; bytes: Uint8Array } | { name: string; url: string })[] = [];
   for (const a of (list?.value || [])) {
-    if (!String(a["@odata.type"] || "").includes("fileAttachment")) continue; // skip item/reference attachments
+    const kind = String(a["@odata.type"] || "");
+    if (kind.includes("referenceAttachment")) {
+      if (a.sourceUrl) out.push({ name: a.name || "Shared file", url: a.sourceUrl });
+      continue;
+    }
+    if (!kind.includes("fileAttachment")) continue; // skip item attachments
     const mime = a.contentType || "application/octet-stream";
     const isImage = mime.startsWith("image/");
     if (a.isInline && isImage && (a.size || 0) < 12000) continue; // skip signature/pixel images
@@ -170,10 +176,14 @@ serve(async (req) => {
           try {
             const atts = await fetchMsAttachments(accessToken, m.id);
             for (const a of atts) {
-              await storeAttachment(supabase, {
-                ticketId, activityId: inboundAct?.id || null,
-                name: a.name, mime: a.mime, bytes: a.bytes, source: "inbound_email",
-              });
+              if ("url" in a) {
+                await storeLinkAttachment(supabase, { ticketId, activityId: inboundAct?.id || null, name: a.name, url: a.url, source: "inbound_email" });
+              } else {
+                await storeAttachment(supabase, {
+                  ticketId, activityId: inboundAct?.id || null,
+                  name: a.name, mime: a.mime, bytes: a.bytes, source: "inbound_email",
+                });
+              }
             }
           } catch (e) { console.error("MS attachment store failed:", (e as Error).message); }
         }
