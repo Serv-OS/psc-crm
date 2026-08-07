@@ -20,6 +20,7 @@ export default function SalesChatCard({ profile }) {
   const [teaching, setTeaching] = useState(false);
   const [learned, setLearned] = useState('');
   const [sessions, setSessions] = useState([]);
+  const [branding, setBranding] = useState({ name: '', accent: '#15C26A' });
   const [copied, setCopied] = useState('');
   const [err, setErr] = useState('');
 
@@ -40,6 +41,16 @@ export default function SalesChatCard({ profile }) {
     ]);
     if (p.error) setErr(p.error.message);
     setPb(p.data || null);
+
+    // The preview link is served from this domain, which is never in a
+    // customer-facing allow-list. Record it so the chat function accepts it.
+    if (p.data && origin && p.data.preview_origin !== origin) {
+      await supabase.from('chat_playbook').update({ preview_origin: origin }).eq('id', 1);
+    }
+
+    const { data: br } = await supabase.from('support_settings')
+      .select('app_name, primary_color').eq('id', 1).maybeSingle();
+    setBranding({ name: (br?.app_name || '').trim(), accent: (br?.primary_color || '').trim() || '#15C26A' });
     setSites(s.data || []);
     setDocs(d.data || []);
     setSessions(c.data || []);
@@ -70,6 +81,9 @@ export default function SalesChatCard({ profile }) {
     const { error } = await supabase.from('chat_sites').insert({
       site_key: newKey(), label: adding.label.trim(),
       allowed_origins: toArr(adding.origins), mode: 'popup',
+      widget_title: branding.name || 'Chat with us',
+      widget_subtitle: 'How can we help?',
+      accent: branding.accent,
     });
     if (error) { setErr(error.message); return; }
     setAdding(null); setErr(''); load();
@@ -120,8 +134,21 @@ export default function SalesChatCard({ profile }) {
     setTimeout(() => setCopied(''), 1800);
   };
 
-  const snippet = (s) => `<script src="${origin}/chat.js" data-site-key="${s.site_key}" defer></script>`;
-  const pageLink = (s) => `${origin}/sales-chat.html?key=${s.site_key}`;
+  const snippet = (s) => [
+    `<script src="${origin}/chat.js"`,
+    `data-site-key="${s.site_key}"`,
+    s.widget_title ? `data-title="${String(s.widget_title).replace(/"/g, '&quot;')}"` : '',
+    s.widget_subtitle ? `data-subtitle="${String(s.widget_subtitle).replace(/"/g, '&quot;')}"` : '',
+    s.accent ? `data-accent="${s.accent}"` : '',
+    'defer></script>',
+  ].filter(Boolean).join(' ');
+  const pageLink = (s) => {
+    const q = new URLSearchParams({ key: s.site_key });
+    if (s.widget_title) q.set('title', s.widget_title);
+    if (s.widget_subtitle) q.set('subtitle', s.widget_subtitle);
+    if (s.accent) q.set('accent', s.accent);
+    return `${origin}/sales-chat.html?${q.toString()}`;
+  };
 
   const input = "w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember disabled:opacity-60";
   const label = "text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-1 block";
@@ -202,11 +229,37 @@ export default function SalesChatCard({ profile }) {
                   </button>
                   {canWrite && <button onClick={() => removeSite(s)} className="text-red-500 hover:text-red-600 text-sm shrink-0" title="Delete">×</button>}
                 </div>
-                <div><label className={label}>Allowed domains</label>
-                  <textarea rows={2} className={input + ' !py-1 resize-none font-mono text-[11px]'} disabled={!canWrite}
-                    value={lines(s.allowed_origins)} placeholder="blank = any"
-                    onChange={e => setSites(ss => ss.map(x => x.id === s.id ? { ...x, allowed_origins: e.target.value.split('\n') } : x))}
-                    onBlur={e => saveSite(s.id, { allowed_origins: toArr(e.target.value) })} /></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className={label}>Heading</label>
+                    <input className={input + ' !py-1 text-xs'} disabled={!canWrite}
+                      value={s.widget_title || ''} placeholder="Peninsula Siding Company"
+                      onChange={e => setSites(ss => ss.map(x => x.id === s.id ? { ...x, widget_title: e.target.value } : x))}
+                      onBlur={e => saveSite(s.id, { widget_title: e.target.value.trim() || null })} /></div>
+                  <div><label className={label}>Line underneath</label>
+                    <input className={input + ' !py-1 text-xs'} disabled={!canWrite}
+                      value={s.widget_subtitle || ''} placeholder="How can we help?"
+                      onChange={e => setSites(ss => ss.map(x => x.id === s.id ? { ...x, widget_subtitle: e.target.value } : x))}
+                      onBlur={e => saveSite(s.id, { widget_subtitle: e.target.value.trim() || null })} /></div>
+                </div>
+
+                <div className="flex items-end gap-2">
+                  <div className="shrink-0"><label className={label}>Colour</label>
+                    <input type="color" className="w-12 h-9 rounded-lg border border-bdr bg-card cursor-pointer" disabled={!canWrite}
+                      value={s.accent || branding.accent}
+                      onChange={e => setSites(ss => ss.map(x => x.id === s.id ? { ...x, accent: e.target.value } : x))}
+                      onBlur={e => saveSite(s.id, { accent: e.target.value })} /></div>
+                  {branding.accent && (s.accent || '').toLowerCase() !== branding.accent.toLowerCase() && canWrite && (
+                    <button onClick={() => saveSite(s.id, { accent: branding.accent })}
+                      className="mb-0.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-card border border-bdr text-muted hover:text-paper">
+                      Use brand colour
+                    </button>
+                  )}
+                  <div className="flex-1 min-w-0"><label className={label}>Allowed domains</label>
+                    <textarea rows={2} className={input + ' !py-1 resize-none font-mono text-[11px]'} disabled={!canWrite}
+                      value={lines(s.allowed_origins)} placeholder="blank = any"
+                      onChange={e => setSites(ss => ss.map(x => x.id === s.id ? { ...x, allowed_origins: e.target.value.split('\n') } : x))}
+                      onBlur={e => saveSite(s.id, { allowed_origins: toArr(e.target.value) })} /></div>
+                </div>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <button onClick={() => copy(snippet(s), 'w' + s.id)}
                     className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-ember/15 text-ember-deep border border-ember/25 hover:bg-ember/25">

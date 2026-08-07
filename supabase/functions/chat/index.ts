@@ -94,13 +94,18 @@ serve(async (req) => {
       .select("*").eq("site_key", site_key).eq("active", true).maybeSingle();
     if (!site) return json({ error: "Unknown or inactive site key" }, 403);
 
-    const origin = req.headers.get("origin");
-    if (!originAllowed(origin, site.allowed_origins || [])) {
-      return json({ error: "This domain isn't allowed to use this chat." }, 403);
-    }
-
     const { data: pbRow } = await supabase.from("chat_playbook").select("*").eq("id", 1).maybeSingle();
     const pb = (pbRow || {}) as any;
+
+    // The back office previews an embed from the CRM's own domain, which is
+    // never in a customer-facing allow-list — "Open ↗" failed every time. That
+    // origin is recorded by the settings screen and always accepted.
+    const origin = req.headers.get("origin");
+    const allowList = [...(site.allowed_origins || [])];
+    if (pb.preview_origin) allowList.push(pb.preview_origin);
+    if (!originAllowed(origin, allowList)) {
+      return json({ error: "This domain isn't allowed to use this chat." }, 403);
+    }
     if (pb.enabled === false) return json({ error: "Chat is turned off." }, 503);
 
     // ── Session ─────────────────────────────────────────────────────────────

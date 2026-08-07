@@ -24,8 +24,9 @@
     siteKey: script.getAttribute('data-site-key') || '',
     mode: (script.getAttribute('data-mode') || 'popup').toLowerCase(),
     target: script.getAttribute('data-target') || '',
-    title: script.getAttribute('data-title') || 'Get a price',
-    accent: script.getAttribute('data-accent') || '#C75A29',
+    title: script.getAttribute('data-title') || 'Chat with us',
+    subtitle: script.getAttribute('data-subtitle') || 'How can we help?',
+    accent: script.getAttribute('data-accent') || '#15C26A',
     api: script.getAttribute('data-api') || API,
     open: script.getAttribute('data-open') === 'true',
   };
@@ -114,7 +115,7 @@
     '<div class="wrap' + (inline ? ' inline' : '') + '">',
     '  <button class="bubble" aria-label="Open the chat">💬<span class="dot"></span></button>',
     '  <div class="panel" role="dialog" aria-label="Sales chat">',
-    '    <div class="head"><div><div class="t"></div><div class="s">Ask about your project</div></div>',
+    '    <div class="head"><div><div class="t"></div><div class="s"></div></div>',
     '      <button class="x" aria-label="Close">✕</button></div>',
     '    <div class="msgs"></div>',
     '    <div class="err" style="display:none"></div>',
@@ -131,6 +132,7 @@
       sendBtn = $('.send'), bubble = $('.bubble'), errEl = $('.err');
   wrap.style.setProperty('--acc', cfg.accent);
   $('.head .t').textContent = cfg.title;
+  $('.head .s').textContent = cfg.subtitle;
 
   function scroll() { msgs.scrollTop = msgs.scrollHeight; }
 

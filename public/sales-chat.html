@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Get a price</title>
+<title>Chat</title>
 <!--
   Always-open sales chat — for a landing page, a QR code at a show stand, or a
   tablet in the office. Open it with the embed's site key:
@@ -36,7 +36,11 @@
       s.setAttribute('data-site-key', key);
       s.setAttribute('data-mode', 'inline');
       s.setAttribute('data-target', '#chat');
-      s.setAttribute('data-title', new URLSearchParams(location.search).get('title') || 'Get a price');
+      var qs = new URLSearchParams(location.search);
+      if (qs.get('title')) s.setAttribute('data-title', qs.get('title'));
+      if (qs.get('subtitle')) s.setAttribute('data-subtitle', qs.get('subtitle'));
+      if (qs.get('accent')) s.setAttribute('data-accent', qs.get('accent'));
+      if (qs.get('title')) document.title = qs.get('title');
       document.body.appendChild(s);
     }
   </script>
