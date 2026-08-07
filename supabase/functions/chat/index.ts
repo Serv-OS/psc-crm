@@ -326,11 +326,12 @@ serve(async (req) => {
       {
         name: "capture_lead",
         description:
-          "Save this person and everything you have established into the CRM. Call it as soon as you have " +
-          "their name and at least an email or a phone number — do not wait until the end. Then call it " +
-          "AGAIN each time you learn something new: it updates the same record rather than creating a " +
-          "second one, and the estimator only sees what you have saved. Always send every field you know " +
-          "so far, not just the new one. Fill in only what you have actually been told; never guess.",
+          "Save this person into the CRM. Call it as soon as you have their name and at least an email or " +
+          "a phone number — do not wait until the end. Then call it AGAIN each time you learn something " +
+          "new: it updates the same record rather than creating a second one. Send only the fields you " +
+          "have just learned or corrected — earlier answers are kept, so there is no need to repeat them. " +
+          "Fill in only what you have actually been told; never guess. Ask your next question in the same " +
+          "reply as the tool call — don't spend a whole turn saving.",
         input_schema: {
           type: "object",
           properties: {
@@ -632,33 +633,58 @@ serve(async (req) => {
     }));
     if (!messages.length) messages.push({ role: "user", content: text });
 
-    let replyText = "";
-    let usedEstimate = false;
+    const MODEL = cfgRow.chat_model || cfgRow.model || "claude-sonnet-5";
 
-    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    // Ask the model. `useTools: false` forces it to answer in words, which is how
+    // we guarantee the visitor always gets a reply.
+    const ask = async (useTools: boolean) => {
       const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": cfgRow.api_key, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: cfgRow.chat_model || cfgRow.model || "claude-sonnet-5",
-          max_tokens: 700,
+          model: MODEL,
+          // capture_lead carries the whole qualification, so a tool call is far
+          // longer than a chat reply. At 700 the call was being truncated
+          // mid-argument: stop_reason came back "max_tokens" with no text and no
+          // usable tool call, and the visitor got the hand-over line instead of
+          // their next question.
+          max_tokens: 2000,
           system,
-          tools,
+          ...(useTools ? { tools } : {}),
           messages,
         }),
       });
       if (!aiRes.ok) {
-        console.error("chat: anthropic error", aiRes.status, await aiRes.text());
-        return await wantHandOver(pb.unknown_reply, "AI request failed");
+        console.error("chat: anthropic error", aiRes.status, (await aiRes.text()).slice(0, 400));
+        return null;
       }
-      const ai = await aiRes.json();
+      return await aiRes.json();
+    };
+
+    let replyText = "";
+    let usedEstimate = false;
+    let lastStop = "";
+
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const ai = await ask(true);
+      if (!ai) return await wantHandOver(pb.unknown_reply, "AI request failed");
+
       const blocks = ai.content || [];
+      lastStop = ai.stop_reason || "";
       // The reply is the TEXT block — a response can open with a thinking block.
-      replyText = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+      const roundText = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+      // Keep the last round that actually said something. Overwriting
+      // unconditionally threw away a perfectly good question whenever the
+      // following round returned tool-only output.
+      if (roundText) replyText = roundText;
 
       const toolCalls = blocks.filter((b: any) => b.type === "tool_use");
-      if (ai.stop_reason !== "tool_use" || !toolCalls.length) break;
+      if (lastStop !== "tool_use" || !toolCalls.length) {
+        if (lastStop === "max_tokens") console.error("chat: response hit max_tokens", { round, hasText: !!roundText });
+        break;
+      }
 
+      console.log("chat: tools", toolCalls.map((c: any) => c.name).join(", "), `(round ${round + 1})`);
       messages.push({ role: "assistant", content: blocks });
       const results: any[] = [];
       for (const call of toolCalls) {
@@ -676,8 +702,19 @@ serve(async (req) => {
       messages.push({ role: "user", content: results });
     }
 
+    // A conversation must never die because the model spent its turn calling
+    // tools. If we came out of the loop with tool results and no words — because
+    // the rounds ran out, or the last response was tool-only — ask once more with
+    // tools switched off so it has no choice but to reply.
     if (!replyText) {
-      return await wantHandOver(pb.unknown_reply, "assistant produced no reply");
+      console.error("chat: no text after tool rounds, forcing a reply", { lastStop });
+      const ai = await ask(false);
+      const forced = ((ai?.content) || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+      if (forced) replyText = forced;
+    }
+
+    if (!replyText) {
+      return await wantHandOver(pb.unknown_reply, `assistant produced no reply (stop_reason: ${lastStop || "none"})`);
     }
 
     // Rule 1, enforced: a figure the engine never produced does not go out.
