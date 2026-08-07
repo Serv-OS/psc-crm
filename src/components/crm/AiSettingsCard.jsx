@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
+// The models offered in the pickers. Anything already saved that isn't in this
+// list is kept and shown, so an existing choice is never silently changed.
+const MODELS = [
+  { id: 'claude-sonnet-5', label: 'Sonnet 5 — fast, low cost' },
+  { id: 'claude-opus-5', label: 'Opus 5 — most capable' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 — cheapest' },
+];
+
 // Settings card for the Claude support assistant. The API key is write-only:
 // we store it, confirm presence, but never display it back.
 export default function AiSettingsCard({ profile }) {
   const [cfg, setCfg] = useState(null);
   const [keyInput, setKeyInput] = useState('');
   const [tone, setTone] = useState('');
+  const [model, setModel] = useState('');
+  const [chatModel, setChatModel] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -18,9 +28,11 @@ export default function AiSettingsCard({ profile }) {
 
   const load = async () => {
     try {
-      const { data } = await supabase.from('ai_settings').select('model, tone, enabled, api_key').eq('id', 1).maybeSingle();
+      const { data } = await supabase.from('ai_settings').select('model, chat_model, tone, enabled, api_key').eq('id', 1).maybeSingle();
       setCfg(data || {});
       setTone(data?.tone || 'friendly, concise and professional');
+      setModel(data?.model || 'claude-opus-5');
+      setChatModel(data?.chat_model || 'claude-sonnet-5');
       setEnabled(data?.enabled ?? true);
     } catch {
       setCfg({});
@@ -31,7 +43,11 @@ export default function AiSettingsCard({ profile }) {
 
   const save = async () => {
     setError(''); setSaving(true); setSaved(false);
-    const patch = { id: 1, tone: tone.trim() || null, enabled, updated_at: new Date().toISOString() };
+    const patch = {
+      id: 1, tone: tone.trim() || null, enabled,
+      model: model || null, chat_model: chatModel || null,
+      updated_at: new Date().toISOString(),
+    };
     if (keyInput.trim()) patch.api_key = keyInput.trim();
     const { error: e } = await supabase.from('ai_settings').upsert(patch, { onConflict: 'id' });
     setSaving(false);
@@ -39,6 +55,15 @@ export default function AiSettingsCard({ profile }) {
     setKeyInput('');
     setSaved(true); setTimeout(() => setSaved(false), 2500);
     load();
+  };
+
+  // Show the saved value even when it isn't one we list, so nobody's existing
+  // choice disappears from the dropdown the first time they open this.
+  const options = (current) => {
+    const list = MODELS.some(m => m.id === current) || !current
+      ? MODELS
+      : [{ id: current, label: `${current} (current)` }, ...MODELS];
+    return list.map(m => <option key={m.id} value={m.id}>{m.label}</option>);
   };
 
   const input = "w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember";
@@ -69,6 +94,26 @@ export default function AiSettingsCard({ profile }) {
                 placeholder={hasKey ? '•••••••••••• (saved — paste a new key to replace)' : 'sk-ant-...'} />
               <div className="text-[11px] text-dim mt-1">
                 Stored securely server-side and used only to draft replies. Create one at console.anthropic.com → API keys.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={label}>Ticket drafting model</label>
+                <select className={input} value={model} onChange={e => setModel(e.target.value)}>
+                  {options(model)}
+                </select>
+                <div className="text-[11px] text-dim mt-1">The ✨ AI reply button. A few calls a day.</div>
+              </div>
+              <div>
+                <label className={label}>Website chat model</label>
+                <select className={input} value={chatModel} onChange={e => setChatModel(e.target.value)}>
+                  {options(chatModel)}
+                </select>
+                <div className="text-[11px] text-dim mt-1">
+                  Every visitor, several turns each. Sonnet handles the script comfortably and costs a
+                  fraction of Opus.
+                </div>
               </div>
             </div>
 
