@@ -39,7 +39,11 @@ export interface Qualification {
   part_of_renovation?: string | null;
   /** Stage 4 */
   material_preference?: string | null;
+  /** lap | panel | shingle | artisan — the engine needs this to price. */
+  profile_preference?: string | null;
   finish_preference?: string | null;
+  /** Asked but not answered. Recorded so the assistant stops circling back. */
+  _skipped?: string[] | null;
   /** Stage 5 */
   preferred_days?: string | null;
   preferred_times?: string | null;
@@ -143,6 +147,7 @@ export function qualificationSummary(q: Qualification): string {
     ["Financing", yesNo(q.wants_financing)],
     ["Part of a renovation", q.part_of_renovation],
     ["Material preference", q.material_preference],
+    ["Profile", q.profile_preference],
     ["Finish preference", q.finish_preference],
     ["Availability", [q.preferred_days, q.preferred_times].filter(Boolean).join(", ") || null],
     ["Site notes", q.access_notes],

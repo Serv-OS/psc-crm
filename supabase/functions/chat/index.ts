@@ -243,6 +243,82 @@ serve(async (req) => {
     const identity = (pb.business_context || "").trim()
       || "You work for a siding contractor. Never claim to be the manufacturer of the products you install.";
 
+    // ── The funnel, tracked in code ─────────────────────────────────────────
+    //
+    // Left to itself the model tracked outstanding questions from the transcript
+    // alone, and drifted: it took "whole house" as the answer to the damage
+    // question, asked for the timeline twice, and never reached square footage.
+    // It also asked for a phone number five messages after being given one.
+    //
+    // So the checklist lives here. Code works out what is answered, what is
+    // still outstanding, and hands the model exactly one thing to ask next. The
+    // model does the talking; it is not asked to remember.
+    const q0 = (session.qualification || {}) as Record<string, any>;
+    const skipped: string[] = Array.isArray(q0._skipped) ? q0._skipped : [];
+
+    type Item = { key: string; got: boolean; label: string; ask: string; optional?: boolean };
+    const has = (k: string) => {
+      const v = q0[k];
+      return !(v === undefined || v === null || v === "");
+    };
+    const CHECKLIST: Item[] = [
+      { key: "name", got: !!session.visitor_name, label: "name", ask: "their name" },
+      { key: "contact", got: !!(session.visitor_email || session.visitor_phone), label: "phone or email", ask: "the best phone number or email" },
+      { key: "address", got: has("address"), label: "property address", ask: "the address of the property" },
+      { key: "is_owner", got: has("is_owner"), label: "owns it", ask: "whether they own the property" },
+      { key: "motivation", got: has("motivation"), label: "why now", ask: "what is prompting them to look into new siding" },
+      { key: "has_damage", got: has("has_damage"), label: "damage", ask: "whether they have noticed damage — cracking, warping, rot, mold, or water getting in" },
+      { key: "scope", got: has("scope"), label: "scope", ask: "whether it is the whole home or specific areas" },
+      { key: "home_age", got: has("home_age"), label: "age of home", ask: "roughly how old the home is" },
+      { key: "current_material", got: has("current_material"), label: "current siding", ask: "what the current siding material is" },
+      { key: "wants_insulation", got: has("wants_insulation"), label: "insulation", ask: "whether they would like insulation included in the quote" },
+      { key: "other_items", got: has("other_items"), label: "other exterior work", ask: "any other exterior items to look at — windows, doors, trim, gutters", optional: true },
+      { key: "sqft", got: !!session.estimate?.sqft, label: "square footage", ask:
+        "whether they know the wall area to be covered, in square feet. Say that most people don't, and " +
+        (measureUrl
+          ? `if they don't, give them this exact link in the same reply: ${measureUrl}`
+          : "if they don't, reassure them an estimator will measure on site") },
+      { key: "profile_preference", got: has("profile_preference"), label: "siding profile", ask: "which profile they picture — lap (horizontal boards), board-and-batten panels, or shingles. Offer a recommendation if they are unsure" },
+      { key: "material_preference", got: has("material_preference"), label: "brand/material", ask: "whether they have a brand or material in mind, like James Hardie fiber cement, or would like a recommendation" },
+      { key: "finish_preference", got: has("finish_preference"), label: "finish", ask: "pre-painted ColorPlus or primed for painting on site" },
+      { key: "timeline", got: has("timeline"), label: "timeline", ask: "when they would ideally like to start — as soon as possible, 1-3 months, 3-6 months, or just researching" },
+      { key: "budget_max", got: has("budget_max"), label: "budget", ask: "whether they have a budget range in mind — optional, never push", optional: true },
+      { key: "preferred_days", got: has("preferred_days") || has("preferred_times"), label: "availability", ask: "what days and times suit a free, no-obligation on-site estimate" },
+      { key: "access_notes", got: has("access_notes"), label: "site notes", ask: "anything worth knowing before the visit — HOA, gated access, dogs, an insurance claim", optional: true },
+      { key: "heard_about_us", got: has("heard_about_us"), label: "how they heard of us", ask: "how they heard about us", optional: true },
+    ];
+
+    const done = CHECKLIST.filter((i) => i.got);
+    const outstanding = CHECKLIST.filter((i) => !i.got && !skipped.includes(i.key));
+    const next = outstanding[0];
+
+    const heldLines = done.map((i) => {
+      if (i.key === "name") return `- name: ${session.visitor_name}`;
+      if (i.key === "contact") return `- contact: ${[session.visitor_email, session.visitor_phone].filter(Boolean).join(" · ")}`;
+      if (i.key === "sqft") return `- square footage: ${Math.round(session.estimate.sqft).toLocaleString("en-US")} sq ft`;
+      const v = q0[i.key];
+      return `- ${i.label}: ${typeof v === "boolean" ? (v ? "yes" : "no") : v}`;
+    });
+    if (session.estimate?.low) {
+      heldLines.push(`- already quoted ${money(session.estimate.low)}–${money(session.estimate.high)} — do not re-quote unless something changed`);
+    }
+
+    const knownBlock = heldLines.length
+      ? `ALREADY ESTABLISHED — never ask for any of these again:\n${heldLines.join("\n")}` +
+        (skipped.length ? `\nAsked and not answered (leave them alone): ${skipped.join(", ")}` : "") +
+        (session.lead_id ? `\nThis enquiry is already saved with an estimator.` : "")
+      : `Nothing established yet — you have not been told their name or how to reach them.`;
+
+    const nextBlock = next
+      ? `ASK NEXT — exactly this, in your own words, and nothing else:\n  ${next.ask}` +
+        (next.optional ? `\n  This one is optional. If they brush it off, move on and never return to it.\n` : `\n`) +
+        `\nStill outstanding after that: ` +
+        (outstanding.slice(1, 5).map((i) => i.label).join(", ") || "nothing — wrap up warmly") + `.\n` +
+        `If their last message answered something, save it FIRST with capture_lead, then ask the above ` +
+        `in the same reply.`
+      : `EVERYTHING IS ANSWERED. Do not ask another question. Confirm an estimator will be in touch, ` +
+        `thank them, and stop.`;
+
     const stages: any[] = Array.isArray(pb.question_stages) ? pb.question_stages : [];
     const points: any[] = Array.isArray(pb.talking_points) ? pb.talking_points : [];
 
@@ -266,14 +342,19 @@ serve(async (req) => {
       `TONE: ${pb.tone}\n` +
       `Never claim to be human — if asked outright whether you're a bot, say so plainly and offer a colleague.\n\n` +
       `${knowledgeBlock}\n\n` +
+      `${knownBlock}\n\n` +
+      `${nextBlock}\n\n` +
       `HOW TO RUN THE CONVERSATION\n` +
-      `- ONE question at a time, conversationally. NEVER present the list, or several questions at once.\n` +
-      `- Work down the stages in order. Stage 1 is required: a conversation with no contact details is ` +
-      `a lost lead, so get those early rather than at the end.\n` +
-      `- Stages 2 to 4 qualify. If they skip one, let it go and move on. Never block on an answer.\n` +
-      `- Never ask the same thing twice, and never ask something they have already told you.\n` +
-      `- You are here to help them, not to interrogate them. If they want to just ask you something, ` +
-      `answer it first and pick the thread back up after.\n\n` +
+      `- This is a sales funnel with an end, not an open-ended chat. Ask the ONE thing under ASK NEXT, ` +
+      `wait for the answer, save it, move on. You are steered by that list — do not invent your own order ` +
+      `and do not wander.\n` +
+      `- ONE question per reply. Never two, never a list.\n` +
+      `- If their answer doesn't match what you asked, take what they DID give you, save it, and ask ` +
+      `ASK NEXT again — briefly and without making a thing of it.\n` +
+      `- If they decline or don't know, put that field in capture_lead's "skipped" list so it is never ` +
+      `raised again.\n` +
+      `- Answer anything they ask you first, then carry on.\n` +
+      `- The stages below are context for why each thing is asked. The order you follow is ASK NEXT.\n\n` +
       `THE STAGES\n${stageBlock}\n\n` +
       (pointsBlock
         ? `SAY THESE — they are statements, not questions. Work them in where they fit naturally, once each.\n${pointsBlock}\n\n`
@@ -287,8 +368,10 @@ serve(async (req) => {
       `Ask whether they know the wall area to be covered. Most people don't, and you should say that is ` +
       `completely normal.\n` +
       (measureUrl
-        ? `If they don't know, point them at our measuring tool: ${measureUrl} — it measures the property ` +
-          `from the map in about a minute. Keep talking to them either way; never let this end the chat.\n`
+        ? `The moment they say they don't know, give them the link in that same reply: ${measureUrl} — it ` +
+          `measures the property from the map in about a minute. Do not ask them to go and find the number ` +
+          `some other way, and do not quietly move on without offering it. Then carry straight on with the ` +
+          `next stage; never let this end the chat.\n`
         : `If they don't know, carry on without it — an estimator will measure on site.\n`) +
       `Never guess it yourself, and never treat the home's living area as the wall area — they are very ` +
       `different numbers.\n\n` +
@@ -371,6 +454,16 @@ serve(async (req) => {
             part_of_renovation: { type: "string", description: "What else it needs coordinating with, if part of a larger renovation." },
             // Stage 4
             material_preference: { type: "string", description: "Brand or material they have in mind, or 'wants a recommendation'." },
+            profile_preference: {
+              type: "string", enum: ["lap", "panel", "shingle", "artisan", "unsure"],
+              description: "Siding profile they picture. 'panel' covers board-and-batten. 'unsure' if they want a recommendation.",
+            },
+            skipped: {
+              type: "array", items: { type: "string" },
+              description:
+                "Field names you ASKED about and they would not or could not answer (e.g. [\"budget_max\"]). " +
+                "Recording it here stops you circling back to it.",
+            },
             finish_preference: { type: "string", enum: ["colorplus", "primed", "undecided"], description: "Fiber cement finish preference." },
             // Stage 5
             preferred_days: { type: "string", description: "Days of the week that suit a site visit." },
@@ -520,6 +613,7 @@ serve(async (req) => {
         wants_financing: pick(args.wants_financing),
         part_of_renovation: pick(args.part_of_renovation),
         material_preference: pick(args.material_preference),
+        profile_preference: pick(args.profile_preference),
         finish_preference: pick(args.finish_preference),
         preferred_days: pick(args.preferred_days),
         preferred_times: pick(args.preferred_times),
@@ -532,6 +626,11 @@ serve(async (req) => {
       const merged: Qualification = { ...(session.qualification || {}) };
       for (const [k, v] of Object.entries(qualification)) {
         if (v !== undefined) (merged as any)[k] = v;
+      }
+      // Questions asked and ducked accumulate, so we stop returning to them.
+      if (Array.isArray(args.skipped) && args.skipped.length) {
+        const prev: string[] = Array.isArray((merged as any)._skipped) ? (merged as any)._skipped : [];
+        (merged as any)._skipped = [...new Set([...prev, ...args.skipped.map(String)])];
       }
 
       const est = session.estimate || null;
@@ -715,6 +814,17 @@ serve(async (req) => {
 
     if (!replyText) {
       return await wantHandOver(pb.unknown_reply, `assistant produced no reply (stop_reason: ${lastStop || "none"})`);
+    }
+
+    // The measuring tool is the entire recovery path for someone who doesn't know
+    // their square footage, and the model kept referring to "the instant quote
+    // tool" without ever pasting the address. Talking about it without linking it
+    // is worse than not mentioning it, so the link is appended if it is missing.
+    if (measureUrl && !session.estimate?.sqft && !replyText.includes(measureUrl)) {
+      const talksAboutMeasuring = /\b(square foot|square feet|sq\.? ?ft|measur\w*|instant quote tool|footage)\b/i.test(replyText);
+      if (talksAboutMeasuring) {
+        replyText = `${replyText.replace(/\s+$/, "")}\n\nYou can measure it from the map here, it takes about a minute: ${measureUrl}`;
+      }
     }
 
     // Rule 1, enforced: a figure the engine never produced does not go out.
