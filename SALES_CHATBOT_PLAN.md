@@ -35,23 +35,63 @@ and the quote that follows come from identical math.
 
 ## The conversation
 
-1. **Qualify.** Works through `chat_playbook.qualifying_questions`
-   conversationally, one at a time — property type, replacing what, timeline,
-   owner or not, town.
-2. **Get to a square footage.** Asks if they know their wall area. Most people
-   don't, and it says so rather than making them feel stupid. If they don't
-   know, it points them at the **measuring tool** (`measure_tool_url`) and keeps
-   talking. It will not guess, and it will not accept living-area square footage
-   as wall area — those are very different numbers.
-3. **Price it**, if it has a square footage → `estimate_project` → a range,
-   explicitly framed as a guide subject to a site visit.
-4. **Capture.** Asks for name, email and phone to send a written estimate and
-   book the visit → `capture_lead`.
+A staged interview, worked through one question at a time, never as a form.
+Editable in Settings → Sales chat.
 
-Capture happens **whether or not** there was a square footage. A lead we can
-call is worth more than a tidy conversation.
+| Stage | | |
+|---|---|---|
+| **1. Contact & property** | **Required** | Name, phone, email, address, do they own it. Captured **early**, not at the end — a conversation with no contact details is a lost lead. If the address is outside the service area it says so kindly and stops. |
+| 2. Scope & condition | Skippable | Why now, damage or water, whole home or areas, home age, current material, insulation, other exterior work |
+| 3. Timeline & budget | Skippable | Start timing, budget (optional, never pushed), financing, part of a bigger renovation |
+| 4. Product | Skippable | Brand or material in mind; ColorPlus vs primed only if fiber cement came up |
+| 5. Booking | The goal | Days and times for the free estimate, access notes, how they heard about us |
 
----
+Square footage sits between stages 2 and 3: it asks whether they know their wall
+area, says plainly that most people don't, and points anyone who doesn't at the
+measuring tool. It will not guess, and will not take living area as wall area.
+
+### Talking points, not questions
+
+"Is a workmanship warranty important to you?" is a leading question no customer
+answers no to. Four things are **stated** at the right moment instead, once each:
+free no-obligation estimates, the workmanship warranty on top of the
+manufacturer's, James Hardie certified installers (only when fiber cement comes
+up), and financing (alongside the budget question).
+
+### Saving as it goes
+
+`capture_lead` is called as soon as there is a name and a contact, then **again
+each time it learns something new** — the same record is updated, not duplicated.
+
+That matters more than it sounds. In testing the bot saved Dave at message two,
+and everything after — the water intrusion, the timeline, when he could meet —
+never reached the CRM. A genuinely hot lead landed scored "nurture, no timeline
+given". `enrichSalesLead` exists for exactly that.
+
+Extraction is still the model's job and it will occasionally miss a field: it
+told Dave it would note the side gate and the dogs, and didn't. So once a lead
+exists the **whole transcript is mirrored onto it after every turn**. Nothing a
+customer says can be lost, whether or not it was extracted into a field.
+
+## Lead scoring
+
+Decided by code (`_shared/leadScore.ts`), not re-judged by the model each time,
+so a rep can trust what the flag means. Applied in this order:
+
+| | |
+|---|---|
+| **Disqualify** | Outside the service area, or a renter with no owner contact. Lead recorded as `disqualified` with a reason, no deal, no quote |
+| **Nurture** | A stated budget under the floor (default $5,000), just researching, or no timeline. `cold` / `new_lead` |
+| **Hot** | Owner + damage or water + starting within 3 months + gave availability. `hot` / `qualified` |
+| **Warm** | Everything else. `warm` / `qualified` |
+
+Budget is checked **before** hot, deliberately. A test caught the opposite
+order: water coming in, wanting to start tomorrow, budget $3,000 scored *hot*.
+Urgency does not make an unaffordable job a rep's next call.
+
+Availability becomes `next_action` ("Book the on-site estimate — they suggested
+Tuesdays or Thursdays, morning"), and the motivation and damage become
+`pain_points`.
 
 ## What lands in the CRM
 
@@ -79,9 +119,11 @@ costs us the lead.
 | File | What |
 |---|---|
 | `supabase/migrations/077_sales_chat.sql` | `chat_sites`, `chat_playbook`, `chat_sessions`, `chat_messages`, `kb_docs`, `kb_search()`, RLS |
+| `supabase/migrations/078_sales_chat_qualification.sql` | The staged script, talking points, scoring settings |
+| `supabase/functions/_shared/leadScore.ts` | Hot / warm / nurture / disqualify, and the rep-facing summary |
 | `supabase/functions/chat/index.ts` | The assistant. Tool loop, guardrails, hand-over |
 | `supabase/functions/_shared/quoteEngine.ts` | TS port of the pricing engine |
-| `supabase/functions/_shared/salesCapture.ts` | contact → property → lead → deal → draft quote |
+| `supabase/functions/_shared/salesCapture.ts` | contact → property → lead → deal → draft quote, and enrichment |
 | `supabase/functions/_shared/priceGuard.ts` | Is this reply quoting a price? |
 | `supabase/functions/kb-learn/index.ts` | Teach it from a page or pasted notes |
 | `public/chat.js` | The widget — dependency-free, shadow DOM |

@@ -35,7 +35,7 @@ export default function SalesChatCard({ profile }) {
       supabase.from('kb_docs').select('id,title,question,category,source,active')
         .order('created_at', { ascending: false }).limit(200),
       supabase.from('chat_sessions')
-        .select('id,status,visitor_name,visitor_email,estimate,lead_id,last_at')
+        .select('id,status,visitor_name,visitor_email,estimate,lead_id,lead_score,last_at')
         .order('last_at', { ascending: false }).limit(10),
     ]);
     if (p.error) setErr(p.error.message);
@@ -53,6 +53,11 @@ export default function SalesChatCard({ profile }) {
     }).eq('id', 1);
     if (error) setErr(error.message);
   };
+
+  const setStage = (i, patch) =>
+    setPb(p => ({ ...p, question_stages: (p.question_stages || []).map((x, j) => j === i ? { ...x, ...patch } : x) }));
+  const setPoint = (i, patch) =>
+    setPb(p => ({ ...p, talking_points: (p.talking_points || []).map((x, j) => j === i ? { ...x, ...patch } : x) }));
 
   const saveSite = async (id, patch) => {
     setSites(ss => ss.map(s => s.id === id ? { ...s, ...patch } : s));
@@ -261,6 +266,36 @@ export default function SalesChatCard({ profile }) {
               </div>
               <div className="text-[10px] text-dim mt-0.5">Outside this it hands over.</div></div>
           </div>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <button type="button" disabled={!canWrite} onClick={() => savePb({ contact_first: !pb.contact_first })}
+              className="flex items-center gap-3 p-2.5 glass-inner rounded-xl text-left disabled:opacity-60">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-paper">Contact details first</div>
+                <div className="text-[10px] text-muted">Captures before they drop off</div>
+              </div>
+              <div className={`relative w-9 h-5 rounded-full transition shrink-0 ${pb.contact_first ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${pb.contact_first ? 'left-[18px]' : 'left-0.5'}`} />
+              </div>
+            </button>
+            <button type="button" disabled={!canWrite} onClick={() => savePb({ booking_enabled: !pb.booking_enabled })}
+              className="flex items-center gap-3 p-2.5 glass-inner rounded-xl text-left disabled:opacity-60">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-paper">Always close on booking</div>
+                <div className="text-[10px] text-muted">Offers the free on-site estimate</div>
+              </div>
+              <div className={`relative w-9 h-5 rounded-full transition shrink-0 ${pb.booking_enabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${pb.booking_enabled ? 'left-[18px]' : 'left-0.5'}`} />
+              </div>
+            </button>
+          </div>
+          <div className="mt-2"><label className={label}>Nurture below this budget ($)</label>
+            <input type="number" className={input} disabled={!canWrite} value={pb.nurture_budget_floor ?? 5000}
+              onChange={e => setPb({ ...pb, nurture_budget_floor: Number(e.target.value) })}
+              onBlur={e => savePb({ nurture_budget_floor: Number(e.target.value) || 0 })} />
+            <div className="text-[10px] text-dim mt-1">
+              A stated budget ceiling under this scores the lead nurture, even with damage and a rush —
+              an unaffordable job is not a rep's next call.
+            </div></div>
           <div className="mt-2"><label className={label}>Measuring tool link</label>
             <input className={input} disabled={!canWrite} value={pb.measure_tool_url || ''}
               placeholder="https://peninsulasidingcompany.com/instant-quote"
@@ -354,11 +389,66 @@ export default function SalesChatCard({ profile }) {
               <input className={input} value={pb.tone || ''} disabled={!canWrite}
                 onChange={e => setPb({ ...pb, tone: e.target.value })}
                 onBlur={e => savePb({ tone: e.target.value })} /></div>
-            <div><label className={label}>What it asks — one per line</label>
-              <textarea rows={5} className={input + ' resize-none text-xs'} value={lines(pb.qualifying_questions)} disabled={!canWrite}
-                onChange={e => setPb({ ...pb, qualifying_questions: e.target.value.split('\n') })}
-                onBlur={e => savePb({ qualifying_questions: toArr(e.target.value) })} />
-              <div className="text-[10px] text-dim mt-1">Worked through conversationally, one at a time — never presented as a form.</div></div>
+            <div>
+              <label className={label}>What it asks, stage by stage</label>
+              <div className="text-[10px] text-dim mb-2">
+                Worked through in order, one question at a time, never as a form. Stage 1 is required —
+                a conversation with no contact details is a lost lead. The rest are skippable.
+              </div>
+              <div className="space-y-2">
+                {(pb.question_stages || []).map((st, i) => (
+                  <div key={st.stage ?? i} className="glass-inner rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-5 h-5 rounded-full bg-ember text-white text-[10px] font-bold flex items-center justify-center shrink-0">{st.stage ?? i + 1}</span>
+                      <input className={input + ' !py-1 flex-1 text-xs font-semibold'} value={st.title || ''} disabled={!canWrite}
+                        onChange={e => setStage(i, { title: e.target.value })}
+                        onBlur={() => savePb({ question_stages: pb.question_stages })} />
+                      <button type="button" disabled={!canWrite} onClick={() => { setStage(i, { required: !st.required }); savePb({ question_stages: (pb.question_stages || []).map((x, j) => j === i ? { ...x, required: !x.required } : x) }); }}
+                        className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded shrink-0 ${st.required ? 'bg-amber-500 text-white' : 'bg-card text-dim border border-bdr'}`}>
+                        {st.required ? 'Required' : 'Skippable'}
+                      </button>
+                    </div>
+                    <textarea rows={Math.max(2, (st.questions || []).length)} disabled={!canWrite}
+                      className={input + ' resize-none text-[11px]'}
+                      value={lines(st.questions)}
+                      onChange={e => setStage(i, { questions: e.target.value.split('\n') })}
+                      onBlur={e => savePb({ question_stages: (pb.question_stages || []).map((x, j) => j === i ? { ...x, questions: toArr(e.target.value) } : x) })} />
+                    {st.note && <div className="text-[10px] text-dim mt-1 italic">{st.note}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className={label}>What it states — never asks</label>
+              <div className="text-[10px] text-dim mb-2">
+                "Is a workmanship warranty important to you?" is a leading question no customer says no to.
+                These are said at the right moment instead, once each.
+              </div>
+              <div className="space-y-1.5">
+                {(pb.talking_points || []).map((tp, i) => (
+                  <div key={i} className="glass-inner rounded-xl p-2 space-y-1">
+                    <input className={input + ' !py-1 text-xs'} value={tp.point || ''} disabled={!canWrite}
+                      onChange={e => setPoint(i, { point: e.target.value })}
+                      onBlur={() => savePb({ talking_points: pb.talking_points })} />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-mono uppercase text-dim shrink-0">when</span>
+                      <input className={input + ' !py-1 text-[11px]'} value={tp.when || ''} disabled={!canWrite}
+                        onChange={e => setPoint(i, { when: e.target.value })}
+                        onBlur={() => savePb({ talking_points: pb.talking_points })} />
+                      {canWrite && (
+                        <button onClick={() => savePb({ talking_points: (pb.talking_points || []).filter((_, j) => j !== i) })}
+                          className="text-red-500 hover:text-red-600 text-xs shrink-0">×</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {canWrite && (
+                <button onClick={() => savePb({ talking_points: [...(pb.talking_points || []), { point: '', when: '' }] })}
+                  className="mt-1.5 text-xs text-ember hover:text-ember-deep font-medium">+ Add a talking point</button>
+              )}
+            </div>
             <div><label className={label}>When it doesn't know</label>
               <textarea rows={2} className={input + ' resize-none'} value={pb.unknown_reply || ''} disabled={!canWrite}
                 onChange={e => setPb({ ...pb, unknown_reply: e.target.value })}
@@ -401,10 +491,13 @@ export default function SalesChatCard({ profile }) {
                     </div>
                   </div>
                   <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded shrink-0 ${
-                    s.lead_id ? 'bg-emerald-100 text-emerald-700'
+                    s.lead_score === 'hot' ? 'bg-red-100 text-red-700'
+                    : s.lead_score === 'warm' ? 'bg-amber-100 text-amber-700'
+                    : s.lead_score === 'nurture' ? 'bg-blue-100 text-blue-700'
+                    : s.lead_score === 'disqualify' ? 'bg-slate-200 text-slate-500'
                     : s.status === 'handed_over' ? 'bg-amber-100 text-amber-700'
                     : 'bg-slate-200 text-slate-600'}`}>
-                    {s.lead_id ? 'Lead' : s.status === 'handed_over' ? 'Handed over' : 'Open'}
+                    {s.lead_score || (s.status === 'handed_over' ? 'Handed over' : 'Open')}
                   </span>
                 </div>
               ))}

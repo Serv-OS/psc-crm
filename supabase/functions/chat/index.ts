@@ -21,8 +21,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildEngineConfig, computeQuote, PRODUCT_NAMES, BATTEN_NAMES, DEMO_LABELS, num } from "../_shared/quoteEngine.ts";
-import { captureSalesLead } from "../_shared/salesCapture.ts";
+import { captureSalesLead, enrichSalesLead } from "../_shared/salesCapture.ts";
 import { mentionsPrice } from "../_shared/priceGuard.ts";
+import type { Qualification } from "../_shared/leadScore.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -62,6 +63,19 @@ function originAllowed(origin: string | null, allowed: string[]): boolean {
 }
 
 const money = (v: number) => "$" + Math.round(v).toLocaleString("en-US");
+
+/** The widget renders replies as plain text, so markdown arrives as literal
+ *  characters — a visitor was shown "**$43,500 to $59,500**". Strip the few
+ *  things a model reaches for out of habit. */
+function plainText(t: string): string {
+  return (t || "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")     // **bold**
+    .replace(/(^|\s)\*(\S[^*]*?)\*(?=\s|$|[.,!?])/g, "$1$2")   // *italic*
+    .replace(/(^|\s)__(.+?)__(?=\s|$|[.,!?])/g, "$1$2")
+    .replace(/^\s*[-*•]\s+/gm, "")        // bullet leaders
+    .replace(/^#{1,6}\s+/gm, "")           // headings
+    .trim();
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -117,9 +131,35 @@ serve(async (req) => {
     const { data: history } = await supabase.from("chat_messages")
       .select("role, content, created_at").eq("session_id", session.id).order("created_at", { ascending: true });
 
-    const say = async (reply: string, extra: Record<string, unknown> = {}) => {
+    const TRANSCRIPT_MARK = "── Full conversation ──";
+
+    // Field extraction is the model's job and it will sometimes miss one — it
+    // told Dave it would note the side gate and the dogs, then didn't. So once a
+    // lead exists the whole conversation is mirrored onto it after every turn.
+    // Nothing a customer says can be lost, whether or not it was extracted.
+    const refreshTranscript = async (finalReply: string) => {
+      if (!session.lead_id) return;
+      try {
+        const lines = [
+          ...(history || []).map((m: any) => `${m.role === "visitor" ? "Visitor" : "Assistant"}: ${m.content}`),
+          `Assistant: ${finalReply}`,
+        ];
+        const transcript = lines.join("\n").slice(-6000);
+        const { data: cur } = await supabase.from("leads").select("notes").eq("id", session.lead_id).maybeSingle();
+        const base = String(cur?.notes || "").split(TRANSCRIPT_MARK)[0].trimEnd();
+        await supabase.from("leads")
+          .update({ notes: `${base}\n\n${TRANSCRIPT_MARK}\n${transcript}` })
+          .eq("id", session.lead_id);
+      } catch (e) {
+        console.error("chat: transcript refresh failed", e);
+      }
+    };
+
+    const say = async (rawReply: string, extra: Record<string, unknown> = {}) => {
+      const reply = plainText(rawReply);
       await supabase.from("chat_messages").insert({ session_id: session.id, role: "bot", content: reply });
       await supabase.from("chat_sessions").update({ last_at: new Date().toISOString() }).eq("id", session.id);
+      await refreshTranscript(reply);
       return json({ session_id: session.id, reply, ...extra });
     };
 
@@ -198,70 +238,143 @@ serve(async (req) => {
     const identity = (pb.business_context || "").trim()
       || "You work for a siding contractor. Never claim to be the manufacturer of the products you install.";
 
+    const stages: any[] = Array.isArray(pb.question_stages) ? pb.question_stages : [];
+    const points: any[] = Array.isArray(pb.talking_points) ? pb.talking_points : [];
+
+    const stageBlock = stages.length
+      ? stages.map((st: any) =>
+          `STAGE ${st.stage} — ${st.title}${st.required ? " (REQUIRED)" : " (skippable)"}\n` +
+          (st.note ? `  ${st.note}\n` : "") +
+          (st.questions || []).map((qn: string) => `  - ${qn}`).join("\n")).join("\n\n")
+      : "Find out what they need and how to reach them.";
+
+    const pointsBlock = points.length
+      ? points.map((tp: any) => `- "${tp.point}"${tp.when ? `  (${tp.when})` : ""}`).join("\n")
+      : "";
+
     const system =
-      `You are ${persona || "an estimator"} on live chat on our website. You are talking to someone ` +
+      `You are ${persona || "an estimator"} on live chat on our website, talking to someone ` +
       `thinking about a siding project.\n\n` +
       `WHO YOU ARE\n${identity}\n` +
-      (pb.service_area ? `Service area: ${pb.service_area}. If they are outside it, say so kindly and stop.\n` : "") +
+      (pb.service_area ? `Service area: ${pb.service_area}.\n` : "") +
       (catalogue.length ? `Products we install: ${catalogue.join(", ")}.\n` : "") + `\n` +
-      `TONE: ${pb.tone}. Short sentences, one question at a time, no bullet-point essays. ` +
+      `TONE: ${pb.tone}\n` +
       `Never claim to be human — if asked outright whether you're a bot, say so plainly and offer a colleague.\n\n` +
       `${knowledgeBlock}\n\n` +
-      `YOUR JOB, IN ORDER\n` +
-      `1. Understand the project. Work through these, conversationally, one at a time — never as a form:\n` +
-      (pb.qualifying_questions || []).map((q: string) => `   - ${q}`).join("\n") + `\n` +
-      `2. Get to a square footage. Ask if they know the wall area they need covered. Most people don't — ` +
-      `that is completely normal and you should say so.\n` +
+      `HOW TO RUN THE CONVERSATION\n` +
+      `- ONE question at a time, conversationally. NEVER present the list, or several questions at once.\n` +
+      `- Work down the stages in order. Stage 1 is required: a conversation with no contact details is ` +
+      `a lost lead, so get those early rather than at the end.\n` +
+      `- Stages 2 to 4 qualify. If they skip one, let it go and move on. Never block on an answer.\n` +
+      `- Never ask the same thing twice, and never ask something they have already told you.\n` +
+      `- You are here to help them, not to interrogate them. If they want to just ask you something, ` +
+      `answer it first and pick the thread back up after.\n\n` +
+      `THE STAGES\n${stageBlock}\n\n` +
+      (pointsBlock
+        ? `SAY THESE — they are statements, not questions. Work them in where they fit naturally, once each.\n${pointsBlock}\n\n`
+        : "") +
+      `SERVICE AREA\n` +
+      (pb.service_area
+        ? `We cover ${pb.service_area}. Once you have the address, check it. If it is outside, tell them ` +
+          `kindly, don't qualify them any further, and set in_service_area to false when you save.\n\n`
+        : `No service area is configured, so do not tell anyone they are outside it.\n\n`) +
+      `GETTING TO A SQUARE FOOTAGE\n` +
+      `Ask whether they know the wall area to be covered. Most people don't, and you should say that is ` +
+      `completely normal.\n` +
       (measureUrl
-        ? `   If they don't know, point them at our measuring tool: ${measureUrl} — it measures the property ` +
-          `from the map in about a minute. Keep chatting to them either way; do NOT let this end the conversation.\n`
-        : `   If they don't know, carry on without it and let an estimator measure on site.\n`) +
-      `   Do not guess a square footage yourself, and do not accept their house's living area as the wall ` +
-      `area — those are very different numbers.\n` +
+        ? `If they don't know, point them at our measuring tool: ${measureUrl} — it measures the property ` +
+          `from the map in about a minute. Keep talking to them either way; never let this end the chat.\n`
+        : `If they don't know, carry on without it — an estimator will measure on site.\n`) +
+      `Never guess it yourself, and never treat the home's living area as the wall area — they are very ` +
+      `different numbers.\n\n` +
       (estimatesOn
-        ? `3. Once you have a square footage, call the estimate_project tool. Give them the range it returns, ` +
-          `in a sentence, and say plainly it's a guide based on what they've told you and that the real ` +
-          `number comes after a site visit.\n`
-        : `3. Do not give any figures. An estimator prices every job.\n`) +
-      `4. Then ask for their name, email and phone so we can send a written estimate and book the visit. ` +
-      `Once you have a name AND an email or phone, call capture_lead. Call it even if you never got a ` +
-      `square footage — a lead we can call is worth far more than a tidy conversation.\n\n` +
+        ? `PRICING\nOnce you have a square footage, call estimate_project and give them the range it ` +
+          `returns, in a sentence. Say plainly that it is a guide based on what they have told you and ` +
+          `that the real number comes after a site visit.\n\n`
+        : `PRICING\nDo not give any figures. An estimator prices every job.\n\n`) +
       `MONEY — READ THIS TWICE\n` +
-      `- You may NEVER state, estimate, guess or "ballpark" a price yourself. The ONLY figures you may put ` +
-      `in front of someone are the low and high returned by estimate_project, quoted as a range.\n` +
-      `- If they push for a firmer number, say the range is as tight as it gets before someone sees the property.\n` +
-      `- Never discuss cost, markup, margin, or what anything costs us. You do not know and must not speculate.\n` +
-      `- Never promise a start date, a discount, financing terms, or anything about warranty beyond what is ` +
-      `in WHAT WE KNOW above.\n\n` +
-      `RULES\n` +
-      `- One question at a time. Wait for the answer.\n` +
-      `- Never ask for the same thing twice.\n` +
-      `- If they are just browsing, be useful and leave the door open. Don't chase.\n` +
-      `- Keep replies under 80 words.\n`;
+      `- You may NEVER state, estimate, guess or "ballpark" a price yourself. The ONLY figures you may ` +
+      `put in front of someone are the low and high returned by estimate_project, quoted as a range.\n` +
+      `- If they push for a firmer number, say the range is as tight as it gets before someone sees it.\n` +
+      `- Never discuss cost, markup or margin. You do not know them and must not speculate.\n` +
+      `- Never promise a start date, a discount, or anything about the warranty beyond what is written ` +
+      `above.\n\n` +
+      `SAVING THE LEAD\n` +
+      `- Call capture_lead as soon as you have their name and either an email or a phone number.\n` +
+      `- Then call it AGAIN in the SAME turn you learn anything new. It updates the same record.\n` +
+      `- If you tell someone you will note something down, you MUST call capture_lead in that same ` +
+      `reply. Saying "I'll make a note of that" and not saving it is the worst thing you can do here — ` +
+      `the estimator turns up knowing nothing about the gate, the dogs or the HOA.\n` +
+      `- The last answers of a conversation (availability, access notes, how they heard about us) are ` +
+      `the ones most often lost. Save them.\n` +
+      `- Always send every field you know so far, not only the new one.\n` +
+      `- Fill in only what you have actually been told. Never invent an answer.\n` +
+      `- Call it even if you never got a square footage. A lead we can call beats a tidy conversation.\n\n` +
+      (pb.booking_enabled !== false
+        ? `HOW TO FINISH\nAlways offer the free, no-obligation on-site estimate and ask what days and ` +
+          `times suit them. That is the point of the conversation.\n\n`
+        : "") +
+      `Keep replies under 80 words. Write plain sentences — no markdown, no asterisks, no bullet ` +
+      `characters. Your reply is shown to the customer exactly as you write it.\n`;
 
     const tools: any[] = [
       {
         name: "capture_lead",
         description:
-          "Save this person and their project into the CRM so an estimator can follow up. Call this as soon " +
-          "as you have their name and at least an email or a phone number. Safe to call without a square footage.",
+          "Save this person and everything you have established into the CRM. Call it as soon as you have " +
+          "their name and at least an email or a phone number — do not wait until the end. Then call it " +
+          "AGAIN each time you learn something new: it updates the same record rather than creating a " +
+          "second one, and the estimator only sees what you have saved. Always send every field you know " +
+          "so far, not just the new one. Fill in only what you have actually been told; never guess.",
         input_schema: {
           type: "object",
           properties: {
-            name: { type: "string", description: "Their full name as they gave it." },
-            email: { type: "string", description: "Email address, if given." },
-            phone: { type: "string", description: "Phone number, if given." },
-            address: { type: "string", description: "Property address, if given." },
+            // Stage 1
+            name: { type: "string", description: "Their full name." },
+            email: { type: "string", description: "Email address." },
+            phone: { type: "string", description: "Phone number." },
+            address: { type: "string", description: "Street address of the property." },
             city: { type: "string", description: "Town or city." },
             zip: { type: "string", description: "ZIP code." },
-            summary: {
+            is_owner: { type: "boolean", description: "True if they own the property." },
+            owner_contact: {
               type: "string",
-              description:
-                "A few lines for the estimator: what they want done, property type, timeline, whether they " +
-                "own it, and anything else useful. Plain sentences.",
+              description: "If they are a tenant or property manager: the owner or decision maker's name and contact.",
             },
+            in_service_area: {
+              type: "boolean",
+              description: "False ONLY if you have established the property is outside our service area.",
+            },
+            // Stage 2
+            motivation: { type: "string", description: "What is prompting them to look into new siding." },
+            has_damage: { type: "boolean", description: "True if they reported damage — cracking, warping, rot, mold." },
+            water_intrusion: { type: "boolean", description: "True if they reported signs of water getting in." },
+            scope: { type: "string", enum: ["whole_home", "specific_areas"], description: "Whole home or specific areas." },
+            areas: { type: "string", description: "Which sides or sections, if only specific areas." },
+            home_age: { type: "string", description: "Roughly how old the home is, as they said it." },
+            current_material: { type: "string", description: "Current siding material — vinyl, wood, fiber cement, aluminum, not sure." },
+            wants_insulation: { type: "boolean", description: "True if they want insulation included in the quote." },
+            other_items: { type: "string", description: "Other exterior work to look at — windows, doors, trim, gutters, repairs." },
+            // Stage 3
+            timeline: {
+              type: "string", enum: ["asap", "1_3_months", "3_6_months", "researching"],
+              description: "When they want to start.",
+            },
+            budget_max: { type: "number", description: "Top of the budget range they stated, in dollars. Omit if they didn't say." },
+            wants_financing: { type: "boolean", description: "True if they asked for financing information." },
+            part_of_renovation: { type: "string", description: "What else it needs coordinating with, if part of a larger renovation." },
+            // Stage 4
+            material_preference: { type: "string", description: "Brand or material they have in mind, or 'wants a recommendation'." },
+            finish_preference: { type: "string", enum: ["colorplus", "primed", "undecided"], description: "Fiber cement finish preference." },
+            // Stage 5
+            preferred_days: { type: "string", description: "Days of the week that suit a site visit." },
+            preferred_times: { type: "string", description: "Morning, afternoon or evening." },
+            access_notes: { type: "string", description: "Anything for the visit — HOA rules, gated access, dogs, insurance claim involved." },
+            heard_about_us: { type: "string", description: "Search, referral, social media, saw our work locally, other." },
+            // Anything with no home above
+            summary: { type: "string", description: "Anything else useful for the estimator, in plain sentences." },
           },
-          required: ["name", "summary"],
+          required: ["name"],
         },
       },
     ];
@@ -380,11 +493,84 @@ serve(async (req) => {
       if (!looksLikeEmail(email) && !looksLikePhone(phone)) {
         return { error: "You need a valid email or a phone number before I can pass this to an estimator. Ask for one." };
       }
-      if (session.lead_id) {
-        return { ok: true, already: true, note: "This enquiry is already with an estimator — don't save it twice." };
+      // Only what the model was actually told. Undefined stays undefined so the
+      // scorer can tell "no" apart from "never asked".
+      const pick = <T,>(v: T): T | undefined => (v === undefined || v === null || v === "" ? undefined : v);
+      const qualification: Qualification = {
+        is_owner: pick(args.is_owner),
+        owner_contact: pick(args.owner_contact),
+        in_service_area: pick(args.in_service_area),
+        motivation: pick(args.motivation),
+        has_damage: pick(args.has_damage),
+        water_intrusion: pick(args.water_intrusion),
+        scope: pick(args.scope),
+        areas: pick(args.areas),
+        home_age: pick(args.home_age),
+        current_material: pick(args.current_material),
+        wants_insulation: pick(args.wants_insulation),
+        other_items: pick(args.other_items),
+        timeline: pick(args.timeline),
+        budget_max: typeof args.budget_max === "number" && args.budget_max > 0 ? args.budget_max : undefined,
+        wants_financing: pick(args.wants_financing),
+        part_of_renovation: pick(args.part_of_renovation),
+        material_preference: pick(args.material_preference),
+        finish_preference: pick(args.finish_preference),
+        preferred_days: pick(args.preferred_days),
+        preferred_times: pick(args.preferred_times),
+        access_notes: pick(args.access_notes),
+        heard_about_us: pick(args.heard_about_us),
+      };
+
+      // Merge onto what we already had: the model sends everything it knows each
+      // time, but a later call must never blank a field an earlier one filled.
+      const merged: Qualification = { ...(session.qualification || {}) };
+      for (const [k, v] of Object.entries(qualification)) {
+        if (v !== undefined) (merged as any)[k] = v;
       }
 
       const est = session.estimate || null;
+      const project = est
+        ? {
+            sqft: est.sqft, stories: est.stories, demoKey: est.demoKey,
+            profileKey: est.profileKey, finishKey: est.finishKey, battenBoards: est.battenBoards,
+            estimateLow: est.low, estimateHigh: est.high,
+          }
+        : null;
+
+      // Already saved? Update it, so everything learned after the first save
+      // still reaches the estimator.
+      if (session.lead_id) {
+        const upd = await enrichSalesLead(supabase, {
+          leadId: session.lead_id,
+          dealId: session.deal_id, contactId: session.contact_id,
+          locationId: (session.qualification || {}).location_id || session.location_id || null,
+          quoteId: session.quote_id,
+          qualification: merged,
+          project,
+          notes: String(args.summary || "").slice(0, 4000),
+          budgetFloor: num(pb.nurture_budget_floor, 5000),
+          address: args.address || null, city: args.city || null, zip: args.zip || null,
+        });
+        await supabase.from("chat_sessions").update({
+          qualification: { ...merged, address: args.address || (session.qualification || {}).address || null,
+                           city: args.city || null, zip: args.zip || null,
+                           location_id: (session.qualification || {}).location_id || null,
+                           summary: args.summary || null },
+          lead_score: upd.score,
+          quote_id: upd.quote_id ?? session.quote_id,
+        }).eq("id", session.id);
+        session.qualification = merged;
+        if (upd.quote_id) session.quote_id = upd.quote_id;
+        if (upd.score === "disqualify" && merged.in_service_area === false) {
+          return {
+            ok: true, out_of_area: true,
+            note: "Updated. The property is outside our service area — tell them kindly, thank them, and " +
+              "don't qualify them any further.",
+          };
+        }
+        return { ok: true, updated: true, note: "Updated the estimator's record. Carry on naturally — don't mention saving." };
+      }
+
       const res = await captureSalesLead(supabase, {
         name,
         email: looksLikeEmail(email) ? email : null,
@@ -393,13 +579,9 @@ serve(async (req) => {
         city: args.city || null,
         zip: args.zip || null,
         notes: String(args.summary || "").slice(0, 4000),
-        project: est
-          ? {
-              sqft: est.sqft, stories: est.stories, demoKey: est.demoKey,
-              profileKey: est.profileKey, finishKey: est.finishKey, battenBoards: est.battenBoards,
-              estimateLow: est.low, estimateHigh: est.high,
-            }
-          : null,
+        qualification: merged,
+        budgetFloor: num(pb.nurture_budget_floor, 5000),
+        project,
       });
 
       await supabase.from("chat_sessions").update({
@@ -408,20 +590,33 @@ serve(async (req) => {
         visitor_email: looksLikeEmail(email) ? email : session.visitor_email,
         visitor_phone: looksLikePhone(phone) ? phone : session.visitor_phone,
         contact_id: res.contact_id, lead_id: res.lead_id, deal_id: res.deal_id, quote_id: res.quote_id,
-        qualification: {
-          summary: String(args.summary || ""),
-          address: args.address || null, city: args.city || null, zip: args.zip || null,
-        },
+        lead_score: res.score,
+        qualification: { ...merged, address: args.address || null, city: args.city || null,
+                         zip: args.zip || null, location_id: res.location_id, summary: args.summary || null },
         pending_reason: null,
       }).eq("id", session.id);
       session.lead_id = res.lead_id;
+      session.deal_id = res.deal_id;
+      session.contact_id = res.contact_id;
+      session.quote_id = res.quote_id;
+      session.qualification = { ...merged, location_id: res.location_id };
       if (looksLikeEmail(email)) session.visitor_email = email;
       if (looksLikePhone(phone)) session.visitor_phone = phone;
       session.visitor_name = name;
 
+      // Out of area is the one outcome the visitor must be told about.
+      if (res.score === "disqualify" && qualification.in_service_area === false) {
+        return {
+          ok: true, out_of_area: true,
+          note: "Saved, but the property is outside our service area. Tell them kindly that we don't cover " +
+            "that area, thank them, and don't qualify them any further.",
+        };
+      }
+
       return {
         ok: true,
-        note: "Saved. Tell them an estimator will be in touch, and roughly when. Do not read any reference number out.",
+        note: "Saved. Tell them an estimator will be in touch. Do not read any reference number out, and " +
+          "do not mention how the lead was graded.",
       };
     };
 
