@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { TEAM_OPTIONS, TEAM_LABELS } from '../UsersPanel.jsx';
 import AiSettingsCard from './AiSettingsCard.jsx';
+import SalesChatCard from './SalesChatCard.jsx';
 import BrandingCard from './BrandingCard.jsx';
 import { connectMicrosoft, useMicrosoftSupportConnection, clearMicrosoftConfigCache } from '../../lib/useMicrosoft.js';
 
@@ -136,6 +137,9 @@ export default function SettingsPanel({ profile }) {
 
           {/* AI Assistant (Claude) */}
           <AiSettingsCard profile={profile} />
+
+          {/* Website sales chat */}
+          <SalesChatCard profile={profile} />
 
           {/* Payments (Stripe) */}
           <div className="glass-card rounded-2xl overflow-hidden">
