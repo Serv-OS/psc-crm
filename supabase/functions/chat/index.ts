@@ -136,7 +136,7 @@ serve(async (req) => {
     const { data: history } = await supabase.from("chat_messages")
       .select("role, content, created_at").eq("session_id", session.id).order("created_at", { ascending: true });
 
-    const TRANSCRIPT_MARK = "── Full conversation ──";
+    const TRANSCRIPT_MARK = "══════════ CHAT TRANSCRIPT ══════════";
 
     // Field extraction is the model's job and it will sometimes miss one — it
     // told Dave it would note the side gate and the dogs, then didn't. So once a
@@ -145,15 +145,34 @@ serve(async (req) => {
     const refreshTranscript = async (finalReply: string) => {
       if (!session.lead_id) return;
       try {
-        const lines = [
-          ...(history || []).map((m: any) => `${m.role === "visitor" ? "Visitor" : "Assistant"}: ${m.content}`),
-          `Assistant: ${finalReply}`,
+        // Who said what has to be unmistakable at a glance. "Visitor:" and
+        // "Assistant:" a line apart ran together into a wall of text, and a rep
+        // skim-reading could not tell which half was the customer — which is the
+        // only half that matters. Every turn is now labelled, numbered and
+        // separated, and the customer's words are marked so they stand out.
+        const turns = [
+          ...(history || []).map((m: any) => ({ who: m.role === "visitor" ? "customer" : "bot", text: m.content })),
+          { who: "bot", text: finalReply },
         ];
-        const transcript = lines.join("\n").slice(-6000);
+        let n = 0;
+        const lines = turns.map((t: any) => {
+          const body = String(t.text || "").trim().split("\n").map((l: string) => `    ${l}`).join("\n");
+          if (t.who === "customer") {
+            n += 1;
+            return `▶ CUSTOMER  (${n})\n${body}`;
+          }
+          return `  assistant (AI)\n${body}`;
+        });
+        const transcript = lines.join("\n\n").slice(-9000);
         const { data: cur } = await supabase.from("leads").select("notes").eq("id", session.lead_id).maybeSingle();
         const base = String(cur?.notes || "").split(TRANSCRIPT_MARK)[0].trimEnd();
+        const footer =
+          `${TRANSCRIPT_MARK}\n` +
+          `Automated website chat. "▶ CUSTOMER" lines are the customer's own words;\n` +
+          `"assistant (AI)" lines were written by the assistant, not by a person.\n\n` +
+          transcript;
         await supabase.from("leads")
-          .update({ notes: `${base}\n\n${TRANSCRIPT_MARK}\n${transcript}` })
+          .update({ notes: `${base}\n\n${footer}` })
           .eq("id", session.lead_id);
       } catch (e) {
         console.error("chat: transcript refresh failed", e);
@@ -190,8 +209,18 @@ serve(async (req) => {
       } else {
         await supabase.from("chat_sessions").update({ status: "handed_over", pending_reason: reason }).eq("id", session.id);
       }
-      await supabase.from("chat_messages").insert({ session_id: session.id, role: "bot", content: reply, escalated: true });
-      return json({ session_id: session.id, reply, escalated: true });
+      // Once it is genuinely with an estimator, say so. "Let me get a person to
+      // pick this up" leaves someone wondering whether anything happened at all.
+      const passedOn = !!session.lead_id;
+      const finalReply = plainText(
+        passedOn
+          ? ((pb.handover_reply || "").trim()
+             || "Thanks — I've passed this through to one of our estimators, who will be in touch shortly.")
+          : reply,
+      );
+      await supabase.from("chat_messages").insert({ session_id: session.id, role: "bot", content: finalReply, escalated: true });
+      await refreshTranscript(finalReply);
+      return json({ session_id: session.id, reply: finalReply, escalated: true });
     };
 
     // Ask once for a way to reach them before giving up on the conversation.
@@ -376,9 +405,11 @@ serve(async (req) => {
       `Never guess it yourself, and never treat the home's living area as the wall area — they are very ` +
       `different numbers.\n\n` +
       (estimatesOn
-        ? `PRICING\nOnce you have a square footage, call estimate_project and give them the range it ` +
-          `returns, in a sentence. Say plainly that it is a guide based on what they have told you and ` +
-          `that the real number comes after a site visit.\n\n`
+        ? `PRICING\nOnce you have a square footage, call estimate_project. When you give the range you ` +
+          `MUST also say what it covers, using the "includes" text the tool returns — in full. A price ` +
+          `on its own makes people assume permits, demolition and waste are extra, and they are not. ` +
+          `Then say the firm figure follows an on-site visit. Never trail off with "just a guide" and ` +
+          `nothing else.\n\n`
         : `PRICING\nDo not give any figures. An estimator prices every job.\n\n`) +
       `MONEY — READ THIS TWICE\n` +
       `- You may NEVER state, estimate, guess or "ballpark" a price yourself. The ONLY figures you may ` +
@@ -573,14 +604,35 @@ serve(async (req) => {
       }).eq("id", session.id);
       session.estimate = { low, high, sqft, stories: num(args.stories, 1), demoKey, profileKey, finishKey, battenBoards: battens || 0 };
 
+      // What the number actually buys. Built from the quote so it only ever
+      // claims the demolition that was really priced, and overridden by the
+      // wording in the playbook when one is set.
+      const demoWord: Record<string, string> = {
+        siding: "stripping and disposing of your existing siding and trim",
+        stucco: "stripping and disposing of the existing stucco",
+        trim: "stripping and disposing of the existing trim",
+        newbuild: "",
+      };
+      const built = [
+        "all materials",
+        result.demoCost > 0 ? (demoWord[demoKey] || "removing the existing cladding") : "",
+        "full installation by our own crews",
+        result.permitsCost > 0 ? "building permits" : "",
+        result.debrisCost > 0 ? "all waste and debris removal" : "",
+      ].filter(Boolean);
+      const includes = (pb.estimate_includes || "").trim()
+        || `Everything: ${built.join(", ")}. We handle the lot — there is nothing else for you to arrange or pay for.`;
+
       return {
         low, high, currency: cfg.currency,
         range: `${money(low)} to ${money(high)}`,
-        covers: "Materials, labour, underlayment, permits, demolition and debris removal.",
+        includes,
         based_on: `${Math.round(sqft).toLocaleString("en-US")} sq ft · ${num(args.stories, 1)} storey · ${mainProd.name}`,
         must_say:
-          "Tell them this is a guide based on what they've described, and the firm number comes after " +
-          "an estimator has seen the property.",
+          "Give the range, then state what it includes using the `includes` text above — say it in full, " +
+          "in your own words, as a proper sentence. Do not shorten it to 'materials and labour' and do not " +
+          "skip it: a bare number reads as if there are extras to come, when there are none. Then say the " +
+          "firm figure follows an on-site visit.",
       };
     };
 
@@ -820,7 +872,11 @@ serve(async (req) => {
     // their square footage, and the model kept referring to "the instant quote
     // tool" without ever pasting the address. Talking about it without linking it
     // is worse than not mentioning it, so the link is appended if it is missing.
-    if (measureUrl && !session.estimate?.sqft && !replyText.includes(measureUrl)) {
+    // …but not once they have just told us the number. The visitor saying
+    // "about 1500 sq ft of wall" was tripping the same keyword check and getting
+    // the link pushed at them anyway, which reads as if it wasn't listening.
+    const gaveSqft = /\b\d{2,5}\s*(?:sq\.?\s*(?:ft|feet)|square\s*(?:ft|feet|foot))/i.test(text);
+    if (measureUrl && !session.estimate?.sqft && !gaveSqft && !replyText.includes(measureUrl)) {
       const talksAboutMeasuring = /\b(square foot|square feet|sq\.? ?ft|measur\w*|instant quote tool|footage)\b/i.test(replyText);
       if (talksAboutMeasuring) {
         replyText = `${replyText.replace(/\s+$/, "")}\n\nYou can measure it from the map here, it takes about a minute: ${measureUrl}`;

@@ -349,6 +349,17 @@ export default function SalesChatCard({ profile }) {
               A stated budget ceiling under this scores the lead nurture, even with damage and a rush —
               an unaffordable job is not a rep's next call.
             </div></div>
+          <div className="mt-2"><label className={label}>What the range includes</label>
+            <textarea rows={3} className={input + ' resize-none'} disabled={!canWrite}
+              value={pb.estimate_includes || ''}
+              placeholder="Leave blank to build it from the quote automatically."
+              onChange={e => setPb({ ...pb, estimate_includes: e.target.value })}
+              onBlur={e => savePb({ estimate_includes: e.target.value.trim() || null })} />
+            <div className="text-[10px] text-dim mt-1">
+              Said every time it gives a figure. A price on its own makes people assume permits, demolition
+              and waste removal are extra. Blank = built from the quote, so it only claims the demolition
+              actually priced.
+            </div></div>
           <div className="mt-2"><label className={label}>Measuring tool link</label>
             <input className={input} disabled={!canWrite} value={pb.measure_tool_url || ''}
               placeholder="https://peninsulasidingcompany.com/instant-quote"
@@ -502,6 +513,12 @@ export default function SalesChatCard({ profile }) {
                   className="mt-1.5 text-xs text-ember hover:text-ember-deep font-medium">+ Add a talking point</button>
               )}
             </div>
+            <div><label className={label}>When it hands over to a person</label>
+              <textarea rows={2} className={input + ' resize-none'} value={pb.handover_reply || ''} disabled={!canWrite}
+                placeholder="Thanks — I've passed this through to one of our estimators, who will be in touch shortly."
+                onChange={e => setPb({ ...pb, handover_reply: e.target.value })}
+                onBlur={e => savePb({ handover_reply: e.target.value.trim() || null })} />
+              <div className="text-[10px] text-dim mt-1">Said once the lead is actually saved and assigned.</div></div>
             <div><label className={label}>When it doesn't know</label>
               <textarea rows={2} className={input + ' resize-none'} value={pb.unknown_reply || ''} disabled={!canWrite}
                 onChange={e => setPb({ ...pb, unknown_reply: e.target.value })}
