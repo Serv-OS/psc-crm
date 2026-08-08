@@ -79,7 +79,11 @@
     '@media (max-width: 480px) {',
     '  .panel { top: 0; right: 0; bottom: 0; left: 0; width: auto; max-width: none;',
     '    height: 100vh; height: 100dvh; max-height: 100dvh; border-radius: 0; }',
-    '  .bubble { display: none; }',
+    // The bubble is the ONLY way to open the chat, and this block used to hide it
+    // outright below 480px — so on a phone the widget was simply invisible and
+    // unopenable. It is hidden only while the full-screen panel is covering it.
+    '  .wrap.open .bubble { display: none; }',
+    '  .bubble { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); }',
     '}',
     '.head { background: var(--acc); color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }',
     '.head .t { font-weight: 700; font-size: 15px; }',
@@ -203,6 +207,7 @@
   var started = false;
   function openPanel() {
     panel.classList.add('open');
+    wrap.classList.add('open');
     if (!started) {
       started = true;
       // Only ask the server to open a conversation when there isn't one. With a
@@ -213,10 +218,13 @@
     }
     setTimeout(function () { ta.focus(); }, 60);
   }
+  // .wrap carries the open state too, because the bubble sits BEFORE the panel
+  // in the DOM and CSS cannot look backwards at a sibling.
+  function closePanel() { panel.classList.remove('open'); wrap.classList.remove('open'); }
   bubble.addEventListener('click', function () {
-    panel.classList.contains('open') ? panel.classList.remove('open') : openPanel();
+    panel.classList.contains('open') ? closePanel() : openPanel();
   });
-  $('.x').addEventListener('click', function () { panel.classList.remove('open'); });
+  $('.x').addEventListener('click', closePanel);
 
   if (inline || cfg.open) openPanel();
 })();
