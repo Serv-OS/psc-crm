@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import ScopeQuestionnaireModal from './ScopeQuestionnaireModal.jsx';
+import { summarize, SCOPE_KIND } from '../../lib/scopeQuestionnaire';
 
 const STAGES = [
   { key: 'new_lead',      label: 'New',                color: '#3b82f6' },
@@ -172,6 +174,11 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
     load();
   };
 
+  // The lead data sits here, validated and ready, while the scope-of-work
+  // questionnaire is completed. Nothing is inserted until it is — a lead
+  // without the qualification checklist can no longer exist from this screen.
+  const [scopeFor, setScopeFor] = useState(null);
+
   const createLead = async (e) => {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -208,15 +215,34 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
       if (!ex?.length) await supabase.from('associations').insert({ from_type: 'contact', from_id: contactId, to_type: 'location', to_id: locationId, label: 'primary_contact' });
     }
 
-    const { data: newLead } = await supabase.from('leads').insert({
-      name: newName.trim(),
-      source: newSource,
-      priority: newPriority,
-      location_id: locationId,
-      contact_id: contactId,
+    // Everything the lead needs is validated and linked. The record itself
+    // waits for the questionnaire.
+    setScopeFor({
+      name: newName.trim(), source: newSource, priority: newPriority,
+      location_id: locationId, contact_id: contactId,
       notes: newNotes.trim() || null,
-      owner_id: profile.id,
+    });
+  };
+
+  const finishCreate = async (scopeAnswers) => {
+    const pending = scopeFor;
+    setScopeFor(null);
+    const { data: newLead, error } = await supabase.from('leads').insert({
+      ...pending, owner_id: profile.id,
     }).select('id').single();
+    if (error || !newLead) { alert('Could not create the lead: ' + (error?.message || 'unknown error')); return; }
+
+    // The completed questionnaire, attached as a tagged activity: the readable
+    // summary lands in the lead's feed, the structured answers travel in
+    // channel_metadata for the Scope card, and each edit adds a new version
+    // rather than overwriting history.
+    const { error: actErr } = await supabase.from('crm_activities').insert({
+      type: 'note', subject_type: 'lead', subject_id: newLead.id,
+      actor_id: profile.id, is_internal: true,
+      body: summarize(scopeAnswers),
+      channel_metadata: { kind: SCOPE_KIND, answers: scopeAnswers, completed_by: profile.id, completed_at: new Date().toISOString() },
+    });
+    if (actErr) alert('Lead created, but the questionnaire failed to attach: ' + actErr.message);
 
     // Reset form
     setNewName(''); setNewSource('website'); setNewPriority('medium'); setNewVenueType('');
@@ -227,7 +253,7 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
     setNewContactFirst(''); setNewContactLast(''); setNewContactEmail(''); setNewContactPhone('');
     setShowCreate(false);
     load();
-    if (newLead) onNavigate?.('lead', newLead.id);
+    onNavigate?.('lead', newLead.id);
   };
 
   const onDragStart = (e, lead) => { setDragItem(lead); e.dataTransfer.effectAllowed = 'move'; };
@@ -423,6 +449,14 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
             </tbody>
           </table>
         </div>
+      )}
+
+      {scopeFor && (
+        <ScopeQuestionnaireModal
+          leadName={scopeFor.name}
+          onComplete={finishCreate}
+          onCancel={() => setScopeFor(null)}
+        />
       )}
     </div>
   );

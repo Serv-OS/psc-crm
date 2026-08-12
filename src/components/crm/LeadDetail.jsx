@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import TimerButton from './TimerButton.jsx';
 import ActivityTimeline from './ActivityTimeline.jsx';
 import AssociationManager from './AssociationManager.jsx';
+import ScopeCard from './ScopeCard.jsx';
 import AttachmentsCard from './AttachmentsCard.jsx';
 import CallButton from '../CallButton.jsx';
 import ScheduleMeeting from './ScheduleMeeting.jsx';
@@ -224,8 +225,9 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
               <AttachmentsCard subjectType="lead" subjectId={leadId} profile={profile} />
             </div>
 
-            {/* MIDDLE: activity */}
+            {/* MIDDLE: scope + activity */}
             <div className="col-span-4 space-y-4">
+              <ScopeCard leadId={leadId} leadName={lead?.name} profile={profile} />
               <Card title="Activity & notes">
                 <ActivityTimeline subjectType="lead" subjectId={leadId} profile={profile} contactEmail={contact?.email} />
               </Card>
