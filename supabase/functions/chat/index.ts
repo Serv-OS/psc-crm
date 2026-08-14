@@ -20,7 +20,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildEngineConfig, computeQuote, PRODUCT_NAMES, BATTEN_NAMES, DEMO_LABELS, num } from "../_shared/quoteEngine.ts";
+import { buildEngineConfig, computeQuote, PRODUCT_NAMES, DEMO_LABELS, num } from "../_shared/quoteEngine.ts";
 import { captureSalesLead, enrichSalesLead } from "../_shared/salesCapture.ts";
 import { mentionsPrice } from "../_shared/priceGuard.ts";
 import type { Qualification } from "../_shared/leadScore.ts";
@@ -532,7 +532,9 @@ serve(async (req) => {
               type: "string", enum: ["colorplus", "primed"],
               description: "Factory colour (colorplus) or primed for painting on site.",
             },
-            battenBoards: { type: "number", description: "Only for board-and-batten panel jobs: number of batten boards." },
+            // battens are never an input: for board-and-batten panel jobs the
+            // engine derives them itself (one every 12 inches) — do not ask
+            // the customer how many battens they need.
           },
           required: ["sqft", "stories", "demoType", "profile", "finish"],
         },
@@ -575,17 +577,16 @@ serve(async (req) => {
         return { error: "We don't have that product in the catalogue. Offer one of the products listed to you instead." };
       }
 
+      // Battens for board-and-batten are derived inside the engine (one every
+      // 12 inches of panel, finish-matched) — nothing to collect or guess here.
       const qty: Record<string, number> = { [mainProd.id]: sqft };
-      const battens = num(args.battenBoards);
-      if (profileKey === "panel" && battens > 0) {
-        const b = cfg.products.find((p) => p.name === BATTEN_NAMES[finishKey]);
-        if (b) qty[b.id] = battens;
-      }
 
       const result = computeQuote(cfg, {
         totalSqft: sqft, numStories: num(args.stories, 1),
         demoType: DEMO_LABELS[demoKey] || "", markup: cfg.markupDefault, qty,
       });
+      const battenRow = result.productRows.find((r: any) => r.type === "batten" && r.qty > 0);
+      const battens = battenRow ? battenRow.qty : 0;
 
       const band = Math.min(1, Math.max(0, num(pb.estimate_band, 0.15)));
       const step = Math.max(1, num(pb.estimate_rounding, 500));

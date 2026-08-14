@@ -82,6 +82,93 @@ test('buildEstimateRecord agrees', () => {
   );
 });
 
+// ── Board-and-batten derivation ─────────────────────────────────────────────
+// The rule: one batten every 12 inches — one batten per 10 sqft on the 4'x10'
+// panels, finish-matched, Sierra excluded, an explicit qty overrides. This
+// catalogue mirrors the LIVE quote_config_products rows (type 'batten').
+const battenRows = {
+  config: rows.config,
+  products: [
+    { id: 'pp', name: "Hardie 4'x10' Primed Panel", type: 'sqft', unit_cost: 2.4, install_rate: 5.5, unit_label: 'SQFT', active: true },
+    { id: 'cp', name: "Hardie 4'x10' ColorPlus Panel", type: 'sqft', unit_cost: 5, install_rate: 5.5, unit_label: 'SQFT', active: true },
+    { id: 'sp', name: "Hardie 4'x10' Primed Panel Sierra 8", type: 'sqft', unit_cost: 3.85, install_rate: 5.5, unit_label: 'SQFT', active: true },
+    { id: 'lap', name: 'Hardie Primed Lap 8.25" x 12\'', type: 'sqft', unit_cost: 2.6, install_rate: 4.5, unit_label: 'SQFT', active: true },
+    { id: 'bp', name: 'Hardie Primed Battens', type: 'batten', unit_cost: 14, install_rate: 0, unit_label: 'Per batten', active: true },
+    { id: 'bc', name: 'Hardie ColorPlus Battens', type: 'batten', unit_cost: 21, install_rate: 0, unit_label: 'Per batten', active: true },
+  ],
+  installMaterials: rows.installMaterials,
+  demoRates: rows.demoRates,
+};
+const battenCfg = js.buildEngineConfig(battenRows);
+const rowFor = (res, id) => res.productRows.find((r) => r.id === id);
+
+test('battens derive at one per 12 inches (quote #1054 scenario)', () => {
+  // 1900 sqft of ColorPlus panel — the quote that shipped WITHOUT battens.
+  const res = js.computeQuote(battenCfg, { totalSqft: 1900, numStories: 1, qty: { cp: 1900 } });
+  const bc = rowFor(res, 'bc');
+  assert.equal(bc.qty, 190, '1900 sqft of 4x10 panel needs 190 battens');
+  assert.equal(bc.auto, true);
+  assert.equal(bc.material, 190 * 21);
+  assert.equal(rowFor(res, 'bp').qty, 0, 'primed battens stay off a ColorPlus job');
+});
+
+test('batten finish matches the panel finish, and partial coverage rounds up', () => {
+  const res = js.computeQuote(battenCfg, { totalSqft: 2435, numStories: 1, qty: { pp: 535, cp: 1900 } });
+  assert.equal(rowFor(res, 'bp').qty, 54, '535 sqft primed panel → ceil(53.5) primed battens');
+  assert.equal(rowFor(res, 'bc').qty, 190);
+});
+
+test('grooved Sierra panels and lap take no battens', () => {
+  const res = js.computeQuote(battenCfg, { totalSqft: 1800, numStories: 1, qty: { sp: 800, lap: 1000 } });
+  assert.equal(rowFor(res, 'bp').qty, 0);
+  assert.equal(rowFor(res, 'bc').qty, 0);
+});
+
+test('an explicit batten qty overrides the rule — including zero', () => {
+  const fifty = js.computeQuote(battenCfg, { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: 50 } });
+  assert.equal(rowFor(fifty, 'bc').qty, 50);
+  assert.equal(rowFor(fifty, 'bc').auto, false);
+  const none = js.computeQuote(battenCfg, { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: 0 } });
+  assert.equal(rowFor(none, 'bc').qty, 0);
+  // …but an EMPTY string (a cleared qty box) means "back to auto".
+  const cleared = js.computeQuote(battenCfg, { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: '' } });
+  assert.equal(rowFor(cleared, 'bc').qty, 190);
+});
+
+test('derived battens land in the estimate record and the totals', () => {
+  const res = js.computeQuote(battenCfg, { totalSqft: 1900, numStories: 1, qty: { cp: 1900 } });
+  const rec = js.buildEstimateRecord(res, battenCfg);
+  const line = rec.products.find((r) => r.id === 'bc');
+  assert.equal(line.qty, 190);
+  assert.equal(line.auto, true);
+  assert.equal(res.sidingMaterialSum, 1900 * 5 + 190 * 21);
+});
+
+test('the TS port derives battens identically', () => {
+  const cfgTs = ts.buildEngineConfig(battenRows);
+  const inputsList = [
+    { totalSqft: 1900, numStories: 1, qty: { cp: 1900 } },
+    { totalSqft: 2435, numStories: 2, qty: { pp: 535, cp: 1900 } },
+    { totalSqft: 1800, numStories: 1, qty: { sp: 800, lap: 1000 } },
+    { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: 50 } },
+    { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: 0 } },
+    { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: '' } },   // cleared box → derive
+    { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: '  ' } }, // whitespace → derive
+    { totalSqft: 1900, numStories: 1, qty: { cp: 1900, bc: null } }, // null → derive
+  ];
+  for (const inputs of inputsList) {
+    const a = ts.computeQuote(cfgTs, inputs);
+    const b = js.computeQuote(battenCfg, inputs);
+    for (const id of ['bp', 'bc']) {
+      assert.equal(rowFor(a, id).qty, rowFor(b, id).qty, `${id} qty drifted`);
+      assert.equal(rowFor(a, id).auto, rowFor(b, id).auto, `${id} auto flag drifted`);
+    }
+    for (const k of ['totalCost', 'salePrice', 'profit', 'margin', 'sidingMaterialSum']) {
+      assert.equal(a[k], b[k], `${k} drifted`);
+    }
+  }
+});
+
 // The range the visitor is shown must bracket the engine price, and must never
 // be presented as a single number.
 test('guidance range brackets the engine price and rounds outward', () => {

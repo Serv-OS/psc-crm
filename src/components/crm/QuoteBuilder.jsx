@@ -67,7 +67,26 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
     setNumStories(inp.numStories != null ? String(inp.numStories) : (est?.num_stories ? String(est.num_stories) : ''));
     setDemoType(inp.demoType ?? est?.demo_type ?? '');
     setMarkup(inp.markup != null ? String(inp.markup) : (est?.markup ? String(est.markup) : String(engineCfg.markupDefault)));
-    setQty(inp.qty || {});
+    // Battens auto-derive when their qty is empty (one every 12 inches of
+    // panel). A quote that has already gone to the customer must NOT reprice
+    // itself just because it was reopened: on non-draft quotes, a batten row
+    // the engine would NEWLY derive (empty qty, and the saved breakdown never
+    // priced that batten) gets an explicit 0, freezing the agreed total.
+    // Quotes whose saved breakdown already carried the batten line stay on
+    // auto — re-deriving reproduces the same number. Clearing the 0 is the
+    // deliberate way to reprice an old quote under the rule.
+    const restoredQty = { ...(inp.qty || {}) };
+    if (est && q.data && q.data.status !== 'draft') {
+      const savedLines = est.breakdown?.products || [];
+      for (const p of engineCfg.products) {
+        if (p.type !== 'batten') continue;
+        const v = restoredQty[p.id];
+        const isEmpty = v === undefined || v === null || String(v).trim() === '';
+        const wasPriced = savedLines.some(r => r.id === p.id && r.qty > 0);
+        if (isEmpty && !wasPriced) restoredQty[p.id] = '0';
+      }
+    }
+    setQty(restoredQty);
     setCustomItems((inp.customItems || []).map((c, i) => ({ key: `c${i}`, name: c.name || '', unit: c.unit || '', cost: c.cost ?? '', installRate: c.installRate ?? '', qty: c.qty ?? '' })));
 
     // Payment schedule (staged billing) + each stage's invoice/charge status
@@ -388,12 +407,14 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
                   <tbody>
                     {cfg.products.map(p => {
                       const row = result.productRows.find(r => r.id === p.id) || { material: 0, install: 0, lineTotal: 0 };
+                      const autoRow = row.auto && row.qty > 0; // battens derived by the engine: 1 per 12" of panel
                       return (
                         <tr key={p.id} className="border-b border-bdr/50">
-                          <td className="px-3 py-2"><div className="text-paper">{p.name}</div><div className="text-[10px] text-dim">{p.unit}</div></td>
+                          <td className="px-3 py-2"><div className="text-paper">{p.name}</div><div className="text-[10px] text-dim">{p.unit}</div>
+                            {autoRow && <div className="text-[10px] text-ember font-semibold">auto: {row.qty} battens — 1 per 12&quot; of panel. Type a qty to override.</div>}</td>
                           <td className="px-2 py-2 text-right font-mono text-muted">{money(p.cost)}</td>
                           <td className="px-2 py-2 text-right font-mono text-muted">{p.installRate ? money(p.installRate) : '—'}</td>
-                          <td className="px-2 py-2 text-right"><input type="number" min="0" className={cell + ' w-20 text-right'} value={qty[p.id] ?? ''} onChange={e => setQty({ ...qty, [p.id]: e.target.value })} disabled={!canWrite} placeholder="0" /></td>
+                          <td className="px-2 py-2 text-right"><input type="number" min="0" className={cell + ' w-20 text-right'} value={qty[p.id] ?? ''} onChange={e => setQty({ ...qty, [p.id]: e.target.value })} disabled={!canWrite} placeholder={autoRow ? String(row.qty) : '0'} /></td>
                           <td className="px-3 py-2 text-right font-mono text-paper">{row.qty > 0 ? money(row.lineTotal) : '—'}</td>
                         </tr>
                       );

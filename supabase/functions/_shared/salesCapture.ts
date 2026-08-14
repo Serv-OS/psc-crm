@@ -3,15 +3,15 @@
 //
 // This is the same sequence the website instant-quote form performs, kept here
 // so the chat assistant produces a lead a rep cannot tell apart from a form
-// submission. (instant-quote/index.ts still carries its own inline copy; if that
-// function is ever revisited it should import from here instead.)
+// submission. (instant-quote/index.ts now imports the same shared engine — its
+// old inline copy silently missed the batten rule.)
 //
 // Everything after the lead is best-effort: a failure building the quote must
 // never cost us the lead itself.
 
 import {
   buildEngineConfig, computeQuote, buildEstimateRecord, buildCustomerLines,
-  PRODUCT_NAMES, BATTEN_NAMES, DEMO_LABELS, num,
+  PRODUCT_NAMES, DEMO_LABELS, num,
 } from "./quoteEngine.ts";
 import { scoreLead, qualificationSummary, painPoints, type Qualification } from "./leadScore.ts";
 
@@ -108,11 +108,12 @@ export async function buildDraftQuote(
       && x.name.toLowerCase().includes(finishKey === "primed" ? "primed" : "colorplus"));
   const qty: Record<string, number> = {};
   if (mainProd) qty[mainProd.id] = sqft;
-  const battenBoards = num(p.battenBoards);
-  if (profileKey === "panel" && battenBoards > 0) {
-    const battenProd = cfg.products.find((x) => x.name === BATTEN_NAMES[finishKey]);
-    if (battenProd) qty[battenProd.id] = battenBoards;
-  }
+  // p.battenBoards is deliberately NOT written into qty: it is always a
+  // machine-derived (or model-guessed, pre-rule) count, and an explicit qty is
+  // a MANUAL override in the engine — persisting it would freeze battens on
+  // the drafted quote so they stop tracking sqft edits in the QuoteBuilder.
+  // The engine derives battens itself: one every 12 inches of panel,
+  // finish-matched. Only a human typing in the QuoteBuilder overrides that.
 
   const result = computeQuote(cfg, {
     totalSqft: sqft, numStories: num(p.stories, 1),

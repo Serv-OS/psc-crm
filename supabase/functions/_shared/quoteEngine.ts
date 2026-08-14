@@ -67,15 +67,40 @@ export function computeQuote(cfg: EngineConfig, inputs: any = {}) {
   const qty = inputs.qty || {};
   const customItems = inputs.customItems || [];
 
+  // Board-and-batten: battens are DERIVED, never guessed. One batten every 12
+  // inches — one per 10 sqft on the 4'x10' panels (height read from the product
+  // name when it states one), finish-matched (ColorPlus↔ColorPlus, primed↔
+  // primed), grooved Sierra panels excluded. An explicit qty on a batten line
+  // (0 included) overrides the rule. Mirrors src/lib/quoteEngine.js exactly.
+  const autoBattens: Record<string, number> = {};
+  for (const b of cfg.products) {
+    if (b.type !== "batten") continue;
+    const provided = qty[b.id];
+    if (!(provided === undefined || provided === null || String(provided).trim() === "")) continue;
+    const wantsColor = /colorplus/i.test(b.name);
+    let strips = 0;
+    for (const p of cfg.products) {
+      if (!/panel/i.test(p.name) || /sierra/i.test(p.name)) continue;
+      if (/colorplus/i.test(p.name) !== wantsColor) continue;
+      const sq = num(qty[p.id]);
+      if (!(sq > 0)) continue;
+      const hm = p.name.match(/x\s*(\d+)\s*'/i);
+      const heightFt = hm ? num(hm[1], 10) : 10;
+      strips += sq / (heightFt > 0 ? heightFt : 10);
+    }
+    if (strips > 0) autoBattens[b.id] = Math.ceil(strips);
+  }
+
   let sidingMaterialSum = 0;
   let sidingInstallSum = 0;
   const productRows = cfg.products.map((p) => {
-    const q = num(qty[p.id]);
+    const auto = autoBattens[p.id] !== undefined;
+    const q = auto ? autoBattens[p.id] : num(qty[p.id]);
     const material = p.cost * q;
     const install = p.installRate * q;
     sidingMaterialSum += material;
     sidingInstallSum += install;
-    return { ...p, qty: q, material, install, lineTotal: material + install };
+    return { ...p, qty: q, auto, material, install, lineTotal: material + install };
   });
 
   const customRows = (customItems as any[]).map((c) => {
@@ -129,7 +154,7 @@ export function buildEstimateRecord(result: any, cfg: EngineConfig) {
     currency: cfg.currency,
     products: result.productRows.filter((r: any) => r.qty > 0).map((r: any) => ({
       id: r.id, name: r.name, unit: r.unit, cost: r.cost, installRate: r.installRate,
-      qty: r.qty, material: r.material, install: r.install, lineTotal: r.lineTotal,
+      qty: r.qty, auto: r.auto === true, material: r.material, install: r.install, lineTotal: r.lineTotal,
     })),
     customItems: result.customRows.map((r: any) => ({
       name: r.name, unit: r.unit, cost: r.cost, installRate: r.installRate,

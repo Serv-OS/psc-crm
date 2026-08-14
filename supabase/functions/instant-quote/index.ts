@@ -4,8 +4,11 @@
 //   internal cost/margin estimate), round-robin assigned to a rep who is notified.
 //
 // The quote is built with the SAME engine + catalogue (quote_config_*) a salesperson
-// uses (ported from src/lib/quoteEngine.js + QuoteBuilder.jsx), so the auto-draft is
-// identical to one built by hand — sales just reviews and sends.
+// uses — imported from _shared/quoteEngine.ts, the maintained port of
+// src/lib/quoteEngine.js — so the auto-draft is identical to one built by hand
+// (battens auto-derive, one every 12 inches) and sales just reviews and sends.
+// (This file used to carry its own inline copy of the engine; that copy silently
+// missed the batten rule, which is exactly why it now imports the shared one.)
 //
 // Optional shared secret: if INSTANT_QUOTE_SECRET is set in the function env, callers
 // must send the same value in `secret`. Honeypot (`company`) + field validation always on.
@@ -13,6 +16,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { graph, msTokenFromRefresh } from "../_shared/microsoft.ts";
+import {
+  buildEngineConfig, computeQuote, buildEstimateRecord, buildCustomerLines,
+  PRODUCT_NAMES, DEMO_LABELS, num,
+} from "../_shared/quoteEngine.ts";
 
 // New-lead alert recipient (Peter). Email needs a connected Microsoft mailbox
 // (microsoft_connections); SMS needs Twilio secrets + an approved A2P registration.
@@ -29,89 +36,6 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const num = (v: any, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
-
-// Website profile+finish -> exact catalogue product name (quote_config_products)
-const PRODUCT_NAMES: Record<string, Record<string, string>> = {
-  lap: { colorplus: 'Hardie ColorPlus Lap 8.25" x 12\'', primed: 'Hardie Primed Lap 8.25" x 12\'' },
-  panel: { colorplus: "Hardie 4'x10' ColorPlus Panel", primed: "Hardie 4'x10' Primed Panel" },
-  shingle: { colorplus: "Straight Edge Shingles ColorPlus", primed: "Straight Edge Shingles Primed" },
-  artisan: { colorplus: "Hardie Artisan V Rustic", primed: "Hardie Artisan V Rustic" },
-};
-const BATTEN_NAMES: Record<string, string> = { colorplus: "Hardie ColorPlus Battens", primed: "Hardie Primed Battens" };
-const DEMO_LABELS: Record<string, string> = { siding: "Demo Siding and Trim", stucco: "Demo Stucco", trim: "Demo Trim", newbuild: "" };
-const SITE_WORKS_LABEL = "Site preparation, materials, permits & debris removal";
-
-// ── Quote engine (ported verbatim from src/lib/quoteEngine.js) ────────────────
-function buildEngineConfig({ config = {} as any, products = [] as any[], installMaterials = [] as any[], demoRates = [] as any[] } = {}) {
-  return {
-    markupDefault: num(config.markup_default, 1.6),
-    permitsPerSqft: num(config.permits_per_sqft, 0.96),
-    debrisPerSqft: num(config.debris_per_sqft, 2),
-    installMatDivisor: num(config.install_mat_divisor, 1000) || 1000,
-    currency: config.currency || "USD",
-    products: (products || []).filter((p) => p.active !== false).map((p) => ({
-      id: p.id, name: p.name, type: p.type || "sqft", cost: num(p.unit_cost), installRate: num(p.install_rate), unit: p.unit_label || "",
-    })),
-    installMaterials: (installMaterials || []).filter((m) => m.active !== false).map((m) => ({ id: m.id, name: m.name, cost: num(m.cost), multiplier: num(m.mult) })),
-    demoRates: (demoRates || []).filter((d) => d.active !== false).map((d) => ({ id: d.id, label: d.label, ratePerSqft: num(d.rate_per_sqft) })),
-  };
-}
-function computeQuote(cfg: any, inputs: any = {}) {
-  const totalSqft = num(inputs.totalSqft);
-  const numStories = num(inputs.numStories);
-  const demoType = inputs.demoType || "";
-  const markup = num(inputs.markup, cfg.markupDefault) || cfg.markupDefault;
-  const qty = inputs.qty || {};
-  let sidingMaterialSum = 0, sidingInstallSum = 0;
-  const productRows = cfg.products.map((p: any) => {
-    const q = num(qty[p.id]); const material = p.cost * q; const install = p.installRate * q;
-    sidingMaterialSum += material; sidingInstallSum += install;
-    return { ...p, qty: q, material, install, lineTotal: material + install };
-  });
-  let installSum = 0;
-  const installMatRows = cfg.installMaterials.map((m: any) => {
-    const rawQty = (totalSqft / cfg.installMatDivisor) * numStories * m.multiplier;
-    const q = Math.round(rawQty * 10) / 10; const lineTotal = m.cost * q; installSum += lineTotal;
-    return { ...m, qty: q, lineTotal };
-  });
-  const laborCost = sidingInstallSum;
-  const demo = cfg.demoRates.find((d: any) => d.label === demoType || d.id === demoType);
-  const demoRate = demo ? demo.ratePerSqft : 0;
-  const demoCost = demoType && demoRate ? totalSqft * demoRate : 0;
-  const permitsCost = totalSqft * cfg.permitsPerSqft;
-  const debrisCost = totalSqft * cfg.debrisPerSqft;
-  const additionalTotal = laborCost + demoCost + permitsCost + debrisCost;
-  const sidingSum = sidingMaterialSum;
-  const totalCost = sidingSum + installSum + additionalTotal;
-  const salePrice = totalCost * markup;
-  const profit = salePrice - totalCost;
-  const margin = salePrice > 0 ? (profit / salePrice) * 100 : 0;
-  return { productRows, customRows: [], installMatRows, sidingMaterialSum, sidingInstallSum, installSum, laborCost, demoCost, demoRate, demoType, permitsCost, debrisCost, additionalTotal, sidingSum, totalCost, salePrice, profit, margin, markup, totalSqft, numStories };
-}
-function buildEstimateRecord(result: any, cfg: any) {
-  return {
-    currency: cfg.currency,
-    products: result.productRows.filter((r: any) => r.qty > 0).map((r: any) => ({ id: r.id, name: r.name, unit: r.unit, cost: r.cost, installRate: r.installRate, qty: r.qty, material: r.material, install: r.install, lineTotal: r.lineTotal })),
-    customItems: [],
-    installMaterials: result.installMatRows.filter((r: any) => r.qty > 0).map((r: any) => ({ name: r.name, cost: r.cost, multiplier: r.multiplier, qty: r.qty, lineTotal: r.lineTotal })),
-    additional: { labor: result.laborCost, demo: result.demoCost, demoType: result.demoType, permits: result.permitsCost, debris: result.debrisCost },
-    totals: { sidingMaterial: result.sidingMaterialSum, sidingInstall: result.sidingInstallSum, installMaterials: result.installSum, totalCost: result.totalCost, markup: result.markup, salePrice: result.salePrice, profit: result.profit, margin: result.margin },
-  };
-}
-function buildCustomerLines(res: any, taxRate: number) {
-  const mk = res.markup; const lines: any[] = []; let sort = 0;
-  res.productRows.filter((r: any) => r.qty > 0).forEach((r: any) => {
-    const lineCustomer = r.lineTotal * mk;
-    lines.push({ product_id: null, name: r.name, description: r.unit ? `${r.qty} ${r.unit}` : null, category: "services", billing_type: "one_off", qty: r.qty, unit_price: r.qty ? lineCustomer / r.qty : lineCustomer, discount: 0, tax_rate: taxRate, line_total: lineCustomer, sort: sort++ });
-  });
-  const siteWorks = (res.installSum + res.demoCost + res.permitsCost + res.debrisCost) * mk;
-  if (siteWorks > 0) {
-    lines.push({ product_id: null, name: SITE_WORKS_LABEL, description: "Underlayment & install materials, building permits, demolition and debris removal", category: "services", billing_type: "one_off", qty: 1, unit_price: siteWorks, discount: 0, tax_rate: taxRate, line_total: siteWorks, sort: sort++ });
-  }
-  return lines;
-}
-
 // Best-effort new-lead alert to Peter — email (Microsoft Graph, if a mailbox is
 // connected) + SMS (Twilio, subject to A2P). Never throws into the caller.
 async function notifyOwner(supabase: any, info: { name: string; line: string; address: string; total: number; quoteNumber: number | null }) {
@@ -181,7 +105,9 @@ serve(async (req) => {
   const demoKey = String(proj.demoKey || "siding");
   const sqft = num(proj.sqft);
   const stories = num(proj.stories, 1);
-  const battenBoards = num(proj.battenBoards);
+  // proj.battenBoards is deliberately ignored: the engine derives battens
+  // itself (one every 12 inches of panel, finish-matched), so the website's
+  // own count can never undercut the rule.
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const parts = name.split(/\s+/);
@@ -276,10 +202,6 @@ serve(async (req) => {
         const mainProd = findProduct(mainName);
         const qty: Record<string, number> = {};
         if (mainProd) qty[mainProd.id] = sqft;
-        if (profileKey === "panel" && battenBoards > 0) {
-          const battenProd = cfg.products.find((p: any) => p.name === BATTEN_NAMES[finishKey]);
-          if (battenProd) qty[battenProd.id] = battenBoards;
-        }
         const result = computeQuote(cfg, { totalSqft: sqft, numStories: stories, demoType: DEMO_LABELS[demoKey] || "", markup: cfg.markupDefault, qty });
 
         const taxRate = 0; // US — no tax on the auto-draft; sales can adjust

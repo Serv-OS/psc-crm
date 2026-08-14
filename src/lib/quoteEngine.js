@@ -59,16 +59,45 @@ export function computeQuote(cfg, inputs = {}) {
   const qty = inputs.qty || {};
   const customItems = inputs.customItems || [];
 
+  // === Board-and-batten: battens are DERIVED, never guessed ===
+  // The rule: one batten every 12 inches. Panels are 4' wide and full-height,
+  // so a batten covers a 1-ft-wide strip the height of the panel — one batten
+  // per 10 sqft on the 4'x10' panels (the height is read from the product name
+  // when it states one). Finish is matched: ColorPlus panels take ColorPlus
+  // battens, primed panels take primed battens. Grooved Sierra panels make the
+  // vertical look without battens, so they are excluded. Typing ANY quantity
+  // on a batten line (0 included) overrides the rule — an estimator can still
+  // correct it, but can no longer forget it.
+  const autoBattens = {};
+  for (const b of cfg.products) {
+    if (b.type !== 'batten') continue;
+    const provided = qty[b.id];
+    if (!(provided === undefined || provided === null || String(provided).trim() === '')) continue;
+    const wantsColor = /colorplus/i.test(b.name);
+    let strips = 0;
+    for (const p of cfg.products) {
+      if (!/panel/i.test(p.name) || /sierra/i.test(p.name)) continue;
+      if (/colorplus/i.test(p.name) !== wantsColor) continue;
+      const sq = num(qty[p.id]);
+      if (!(sq > 0)) continue;
+      const hm = p.name.match(/x\s*(\d+)\s*'/i);
+      const heightFt = hm ? num(hm[1], 10) : 10;
+      strips += sq / (heightFt > 0 ? heightFt : 10);
+    }
+    if (strips > 0) autoBattens[b.id] = Math.ceil(strips);
+  }
+
   // === Siding products (material + per-product install) ===
   let sidingMaterialSum = 0;
   let sidingInstallSum = 0;
   const productRows = cfg.products.map((p) => {
-    const q = num(qty[p.id]);
+    const auto = autoBattens[p.id] !== undefined;
+    const q = auto ? autoBattens[p.id] : num(qty[p.id]);
     const material = p.cost * q;
     const install = p.installRate * q;
     sidingMaterialSum += material;
     sidingInstallSum += install;
-    return { ...p, qty: q, material, install, lineTotal: material + install };
+    return { ...p, qty: q, auto, material, install, lineTotal: material + install };
   });
 
   // === Custom (ad-hoc) siding items ===
@@ -151,7 +180,7 @@ export function buildEstimateRecord(result, cfg) {
     currency: cfg.currency,
     products: result.productRows
       .filter((r) => r.qty > 0)
-      .map((r) => ({ id: r.id, name: r.name, unit: r.unit, cost: r.cost, installRate: r.installRate, qty: r.qty, material: r.material, install: r.install, lineTotal: r.lineTotal })),
+      .map((r) => ({ id: r.id, name: r.name, unit: r.unit, cost: r.cost, installRate: r.installRate, qty: r.qty, auto: r.auto === true, material: r.material, install: r.install, lineTotal: r.lineTotal })),
     customItems: result.customRows.map((r) => ({ name: r.name, unit: r.unit, cost: r.cost, installRate: r.installRate, qty: r.qty, material: r.material, install: r.install, lineTotal: r.lineTotal })),
     installMaterials: result.installMatRows
       .filter((r) => r.qty > 0)
