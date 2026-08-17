@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SECTIONS, missingRequired } from '../../lib/scopeQuestionnaire';
 
 // The gate on manual lead creation: the Homeowner Siding Scope-of-Work
@@ -71,10 +72,18 @@ export default function ScopeQuestionnaireModal({ leadName, initial, onComplete,
     );
   };
 
-  return (
+  // Portalled to <body> on purpose. The lead record renders this from inside a
+  // .glass-card, and that card sets backdrop-filter — which makes it the
+  // containing block for position:fixed children, so the "fullscreen" overlay
+  // was being laid out inside the card and then clipped by its overflow-hidden.
+  // It looked like the questionnaire never opened; it was opening in a box the
+  // size of a card. A portal escapes both the containing block and the clip.
+  return createPortal((
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
       onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div className="glass-card rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden">
+      {/* relative: anchors the "what's missing" popover to the dialog rather
+          than the full-screen overlay, where it stretched the whole width. */}
+      <div className="glass-card relative rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden">
 
         <div className="px-5 py-4 border-b border-bdr flex items-center gap-3 shrink-0">
           <div>
@@ -139,5 +148,5 @@ export default function ScopeQuestionnaireModal({ leadName, initial, onComplete,
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
