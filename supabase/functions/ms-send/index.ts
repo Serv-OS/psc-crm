@@ -54,14 +54,29 @@ serve(async (req) => {
     const recipients = [{ emailAddress: { address: to } }];
     const ccRecipients = cc ? [{ emailAddress: { address: cc } }] : undefined;
 
+    // Threaded reply onto the original message when we still can, but NEVER at
+    // the cost of the reply itself. Exchange re-keys an item the moment it is
+    // moved, archived or deleted, so a stored message id goes stale as soon as
+    // anyone files the mail (or a forwarding rule clears the inbox) — Graph then
+    // answers /reply with 404 ErrorItemNotFound and the agent's reply died with
+    // it. On any not-found we fall through to a standalone message: the customer
+    // gets their answer, at worst in a new mail thread instead of the old one.
+    let sent = false;
     if (srcMsgId) {
-      // Threaded reply onto the original message.
-      await graph(accessToken, `/me/messages/${srcMsgId}/reply`, {
-        method: "POST",
-        body: JSON.stringify({ message: { toRecipients: recipients, ccRecipients, ...(graphAtts.length ? { attachments: graphAtts } : {}) }, comment: body }),
-      });
-    } else {
-      // No prior inbound — start a fresh message.
+      try {
+        await graph(accessToken, `/me/messages/${srcMsgId}/reply`, {
+          method: "POST",
+          body: JSON.stringify({ message: { toRecipients: recipients, ccRecipients, ...(graphAtts.length ? { attachments: graphAtts } : {}) }, comment: body }),
+        });
+        sent = true;
+      } catch (e) {
+        const msg = String((e as Error)?.message || "");
+        if (!/404|ErrorItemNotFound/i.test(msg)) throw e;
+        console.warn("threaded reply unavailable (source message gone), sending standalone:", msg.slice(0, 160));
+      }
+    }
+    if (!sent) {
+      // No prior inbound, or the original message is no longer in the mailbox.
       await graph(accessToken, `/me/sendMail`, {
         method: "POST",
         body: JSON.stringify({

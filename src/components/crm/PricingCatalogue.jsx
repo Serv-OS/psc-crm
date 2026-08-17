@@ -137,10 +137,11 @@ export default function PricingCatalogue({ profile }) {
         <div className="max-w-[1100px]">
           {tab === 'products' && (
             <div className="glass-card rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 text-[11px] text-dim border-b border-bdr">Type drives the estimator: <span className="font-mono">batten</span> rows are auto-quantified (one batten per 12&quot; of matching panel) — the others just price per unit. Recreating a batten product as <span className="font-mono">sqft</span> silently kills the auto-batten rule.</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-[10px] uppercase tracking-wider text-dim border-b border-bdr">
-                    <th className="text-left px-3 py-2">Product</th><th className="px-2 py-2 w-24">Unit</th>
+                    <th className="text-left px-3 py-2">Product</th><th className="px-2 py-2 w-24">Type</th><th className="px-2 py-2 w-24">Unit</th>
                     <th className="text-right px-2 py-2 w-28">Unit cost</th><th className="text-right px-2 py-2 w-28">Install/unit</th>
                     <th className="text-center px-2 py-2 w-20">Active</th>
                   </tr></thead>
@@ -148,6 +149,14 @@ export default function PricingCatalogue({ profile }) {
                     {products.map((p, i) => (
                       <tr key={p.id || `n${i}`} className={`border-b border-bdr/50 ${p.active === false ? 'opacity-50' : ''}`}>
                         <td className="px-3 py-2"><input className={cell + ' w-full'} value={p.name} onChange={e => upd(setProducts, products, i, { name: e.target.value })} placeholder="Product name" disabled={!canWrite} /></td>
+                        <td className="px-2 py-2">
+                          <select className={cell + ' w-24'} value={p.type || 'sqft'} onChange={e => upd(setProducts, products, i, { type: e.target.value })} disabled={!canWrite}>
+                            <option value="sqft">sqft</option>
+                            <option value="batten">batten</option>
+                            <option value="length">length</option>
+                            <option value="each">each</option>
+                          </select>
+                        </td>
                         <td className="px-2 py-2"><input className={cell + ' w-20'} value={p.unit_label || ''} onChange={e => upd(setProducts, products, i, { unit_label: e.target.value })} placeholder="SQFT" disabled={!canWrite} /></td>
                         <td className="px-2 py-2"><input type="number" step="0.01" className={cell + ' w-24 text-right'} value={p.unit_cost} onChange={e => upd(setProducts, products, i, { unit_cost: e.target.value })} disabled={!canWrite} /></td>
                         <td className="px-2 py-2"><input type="number" step="0.01" className={cell + ' w-24 text-right'} value={p.install_rate} onChange={e => upd(setProducts, products, i, { install_rate: e.target.value })} disabled={!canWrite} /></td>
