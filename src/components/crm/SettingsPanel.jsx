@@ -576,12 +576,17 @@ export default function SettingsPanel({ profile }) {
                 <div className="w-10 h-10 rounded-xl bg-ember/15 border border-ember/25 flex items-center justify-center text-lg">{'\u{1F4DC}'}</div>
                 <div className="flex-1">
                   <div className="text-base font-bold text-paper">Quote terms &amp; conditions</div>
-                  <div className="text-xs text-muted">Default T&amp;Cs shown on every quote (a quote can override its own)</div>
+                  <div className="text-xs text-muted">
+                    Default T&amp;Cs shown on every quote (a quote can override its own)
+                    {settings.quote_terms ? ` · ${settings.quote_terms.trim().split(/\s+/).length} words` : ''}
+                  </div>
                 </div>
               </div>
               <div className="p-5">
-                <textarea disabled={!isOwner} rows={6}
-                  className="w-full px-3 py-2 bg-card border border-bdr rounded-xl text-sm text-paper placeholder-dim focus:outline-none focus:border-ember resize-none disabled:opacity-60"
+                {/* A full contract lives here, so it needs room and a
+                    monospaced face to keep the numbered clauses aligned. */}
+                <textarea disabled={!isOwner} rows={20}
+                  className="w-full px-3 py-2 bg-card border border-bdr rounded-xl font-mono text-[11px] leading-relaxed text-paper placeholder-dim focus:outline-none focus:border-ember resize-y disabled:opacity-60"
                   value={settings.quote_terms || ''}
                   onChange={e => setSettings(s => ({ ...s, quote_terms: e.target.value }))}
                   onBlur={e => saveSettings({ quote_terms: e.target.value })}

@@ -103,14 +103,16 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
 
   const setQ = (k, v) => setQuote(prev => ({ ...prev, [k]: v }));
 
-  // Pull the standard terms in rather than making anyone paste a contract.
+  // Only for overriding. Left blank, a quote shows the standard terms from
+  // Settings — which is why the button pulls a COPY in for editing rather than
+  // being the way terms normally get onto a quote.
   const loadStandardTerms = async () => {
-    if (quote.terms && !confirm('Replace the terms on this quote with the standard terms?')) return;
+    if (quote.terms && !confirm('Replace the terms on this quote with a copy of the standard terms?')) return;
     setLoadingTerms(true);
-    const { data, error } = await supabase.from('quote_config').select('default_terms').eq('id', 1).maybeSingle();
+    const { data, error } = await supabase.from('support_settings').select('quote_terms').eq('id', 1).maybeSingle();
     setLoadingTerms(false);
-    if (error || !data?.default_terms) { alert('No standard terms are saved yet.'); return; }
-    setQ('terms', data.default_terms);
+    if (error || !data?.quote_terms) { alert('No standard terms are saved in Settings yet.'); return; }
+    setQ('terms', data.quote_terms);
   };
 
   const result = useMemo(() => {
@@ -477,11 +479,13 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
             <div className="glass-card rounded-2xl p-4 space-y-2">
               <div className="flex items-center gap-2 mb-1">
                 <div className="text-sm font-bold text-paper">Terms &amp; conditions</div>
-                <span className="text-[10px] text-dim">{termsWords} words · shown to the customer</span>
+                <span className="text-[10px] text-dim">
+                  {termsWords ? `${termsWords} words · overrides Settings` : 'blank · uses the standard terms from Settings'}
+                </span>
                 {canWrite && (
                   <button onClick={loadStandardTerms} disabled={loadingTerms}
                     className="ml-auto text-xs text-ember hover:text-ember-deep font-medium disabled:opacity-50">
-                    {loadingTerms ? 'Loading…' : quote.terms ? 'Reset to standard terms' : 'Use standard terms'}
+                    {loadingTerms ? 'Loading…' : quote.terms ? 'Reset to standard terms' : 'Copy standard terms in to edit'}
                   </button>
                 )}
               </div>
