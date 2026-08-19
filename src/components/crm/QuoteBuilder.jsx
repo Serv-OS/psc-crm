@@ -25,6 +25,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
   const [locations, setLocations] = useState([]);
   const [cfg, setCfg] = useState(null); // engine config built from the catalogue
   const [saving, setSaving] = useState(false);
+  const [loadingTerms, setLoadingTerms] = useState(false);
   const [saved, setSaved] = useState(false);
 
   // Estimator inputs
@@ -102,11 +103,22 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
 
   const setQ = (k, v) => setQuote(prev => ({ ...prev, [k]: v }));
 
+  // Pull the standard terms in rather than making anyone paste a contract.
+  const loadStandardTerms = async () => {
+    if (quote.terms && !confirm('Replace the terms on this quote with the standard terms?')) return;
+    setLoadingTerms(true);
+    const { data, error } = await supabase.from('quote_config').select('default_terms').eq('id', 1).maybeSingle();
+    setLoadingTerms(false);
+    if (error || !data?.default_terms) { alert('No standard terms are saved yet.'); return; }
+    setQ('terms', data.default_terms);
+  };
+
   const result = useMemo(() => {
     if (!cfg) return null;
     return computeQuote(cfg, { totalSqft, numStories, demoType, markup, qty, customItems });
   }, [cfg, totalSqft, numStories, demoType, markup, qty, customItems]);
 
+  const termsWords = (quote?.terms || '').trim() ? (quote.terms.trim().split(/\s+/).length) : 0;
   const taxRate = Number(quote?.tax_rate) || 0;
   const salePrice = result?.salePrice || 0;
   const taxAmount = salePrice * taxRate / 100;
@@ -459,11 +471,27 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
               </div>
             </div>
 
-            {/* Terms & notes */}
+            {/* Terms & notes. The terms are a full contract, not a sentence:
+                a 2-row box with resizing disabled made them impossible to read
+                or paste into, which is why they were empty on every quote. */}
             <div className="glass-card rounded-2xl p-4 space-y-2">
-              <div className="text-sm font-bold text-paper mb-1">Terms &amp; notes</div>
-              <textarea className={input + ' resize-none'} rows={2} value={quote.terms || ''} onChange={e => setQ('terms', e.target.value)} placeholder="Terms & conditions shown on the quote" disabled={!canWrite} />
-              <textarea className={input + ' resize-none'} rows={2} value={quote.notes || ''} onChange={e => setQ('notes', e.target.value)} placeholder="Internal notes (not shown to customer)" disabled={!canWrite} />
+              <div className="flex items-center gap-2 mb-1">
+                <div className="text-sm font-bold text-paper">Terms &amp; conditions</div>
+                <span className="text-[10px] text-dim">{termsWords} words · shown to the customer</span>
+                {canWrite && (
+                  <button onClick={loadStandardTerms} disabled={loadingTerms}
+                    className="ml-auto text-xs text-ember hover:text-ember-deep font-medium disabled:opacity-50">
+                    {loadingTerms ? 'Loading…' : quote.terms ? 'Reset to standard terms' : 'Use standard terms'}
+                  </button>
+                )}
+              </div>
+              <textarea className={input + ' resize-y font-mono text-[11px] leading-relaxed'} rows={16}
+                value={quote.terms || ''} onChange={e => setQ('terms', e.target.value)}
+                placeholder="Terms & conditions shown on the quote" disabled={!canWrite} />
+
+              <div className="text-sm font-bold text-paper pt-2">Internal notes</div>
+              <textarea className={input + ' resize-y'} rows={3} value={quote.notes || ''} onChange={e => setQ('notes', e.target.value)}
+                placeholder="Internal notes (not shown to customer)" disabled={!canWrite} />
             </div>
 
           </div>
