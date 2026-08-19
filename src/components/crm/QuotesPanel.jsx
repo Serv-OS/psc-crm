@@ -53,8 +53,9 @@ export default function QuotesPanel({ profile, onNavigate }) {
   };
 
   const createQuote = async () => {
+    const terms = await defaultTerms();
     const { data, error } = await supabase.from('quotes').insert({
-      status: 'draft', created_by: profile.id,
+      status: 'draft', created_by: profile.id, terms,
       location_id: newLocation || null, contact_id: newContact || null,
       valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     }).select('id').single();
@@ -195,4 +196,12 @@ export default function QuotesPanel({ profile, onNavigate }) {
       </div>
     </div>
   );
+}
+
+// The standard terms, copied onto each new quote rather than referenced. A
+// quote already sent must keep the wording the customer agreed to, even after
+// the default is edited.
+async function defaultTerms() {
+  const { data } = await supabase.from('quote_config').select('default_terms').eq('id', 1).maybeSingle();
+  return data?.default_terms || null;
 }

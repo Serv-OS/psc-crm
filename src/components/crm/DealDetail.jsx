@@ -62,9 +62,12 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
       .limit(1);
     const locationId = locAssoc && locAssoc.length ? (locAssoc[0].from_type === 'location' ? locAssoc[0].from_id : locAssoc[0].to_id) : null;
     const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const { data: cfg } = await supabase.from('quote_config').select('default_terms').eq('id', 1).maybeSingle();
     const { data, error } = await supabase.from('quotes').insert({
       deal_id: dealId, company_id: deal.company_id || null, contact_id: contactId, location_id: locationId,
       tax_rate: 20, payment_terms: 'pay_now', valid_until: validUntil, created_by: profile.id,
+      // Copied, not referenced: a sent quote keeps the terms it was sent with.
+      terms: cfg?.default_terms || null,
     }).select().single();
     if (error) { alert('Could not create quote: ' + error.message); return; }
     onNavigate?.('quote', data.id);
