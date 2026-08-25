@@ -59,7 +59,7 @@ serve(async (req) => {
     // moved, archived or deleted, so a stored message id goes stale as soon as
     // anyone files the mail (or a forwarding rule clears the inbox) — Graph then
     // answers /reply with 404 ErrorItemNotFound and the agent's reply died with
-    // it. On any not-found we fall through to a standalone message: the customer
+    // it. On ANY refusal we fall through to a standalone message: the customer
     // gets their answer, at worst in a new mail thread instead of the old one.
     let sent = false;
     if (srcMsgId) {
@@ -70,9 +70,18 @@ serve(async (req) => {
         });
         sent = true;
       } catch (e) {
-        const msg = String((e as Error)?.message || "");
-        if (!/404|ErrorItemNotFound/i.test(msg)) throw e;
-        console.warn("threaded reply unavailable (source message gone), sending standalone:", msg.slice(0, 160));
+        // ANY failure here, not just not-found. The first version only caught
+        // 404/ErrorItemNotFound, and Exchange promptly produced a second way to
+        // refuse: 400 ErrorInvalidReferenceItem, "the reference item does not
+        // support the requested operation" — a stored id that points at
+        // something you cannot reply to (a draft, a non-mail item, a message
+        // that has since been replaced). The reply died with it.
+        //
+        // Threading is a nicety; sending is the job. Whatever Exchange objects
+        // to, fall through to a standalone message. If that fails too, its own
+        // error surfaces rather than this one.
+        console.warn("threaded reply refused, sending standalone:",
+          String((e as Error)?.message || "").slice(0, 200));
       }
     }
     if (!sent) {
