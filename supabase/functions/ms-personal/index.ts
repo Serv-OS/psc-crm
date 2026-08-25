@@ -110,9 +110,21 @@ serve(async (req) => {
       const recipients = String(to).split(/[,;]/).map((a) => ({ emailAddress: { address: a.trim() } })).filter((r) => r.emailAddress.address);
       const content = html || text;
       const contentType = html ? "HTML" : "Text";
+      // Reply onto the original thread when Exchange lets us, but never at the
+      // cost of the message. A stored id goes stale the moment the mail is
+      // moved or filed (404 ErrorItemNotFound), and some items refuse a reply
+      // outright (400 ErrorInvalidReferenceItem — drafts, non-mail items, a
+      // message since replaced). Either way the send used to die with it.
+      let threaded = false;
       if (replyToId) {
-        await graph(accessToken, `/me/messages/${replyToId}/reply`, { method: "POST", body: JSON.stringify({ message: { toRecipients: recipients }, comment: content }) });
-      } else {
+        try {
+          await graph(accessToken, `/me/messages/${replyToId}/reply`, { method: "POST", body: JSON.stringify({ message: { toRecipients: recipients }, comment: content }) });
+          threaded = true;
+        } catch (e) {
+          console.warn("threaded reply refused, sending standalone:", String((e as Error)?.message || "").slice(0, 200));
+        }
+      }
+      if (!threaded) {
         await graph(accessToken, `/me/sendMail`, { method: "POST", body: JSON.stringify({ message: { subject: subject || "(no subject)", body: { contentType, content }, toRecipients: recipients }, saveToSentItems: true }) });
       }
       return json({ success: true });
