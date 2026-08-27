@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { handleClosedWon } from '../../lib/dealHelpers';
 import { buildEngineConfig, computeQuote, buildEstimateRecord } from '../../lib/quoteEngine';
@@ -40,6 +40,20 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
 
   useEffect(() => { load(); }, [quoteId]);
+
+  // A staged quote with no schedule yet starts from the house standard
+  // (40 / 30 / 30) instead of an empty panel — Save still validates that the
+  // stages reconcile to the customer total. Once per visit, so deliberately
+  // clearing the schedule isn't fought.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current || !quote || !canWrite) return;
+    if (quote.payment_terms === 'staged' && stages.length === 0 && !stagesLocked) {
+      seededRef.current = true;
+      seedSchedule();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote?.payment_terms, stages.length]);
 
   const load = async () => {
     const [q, conf, prods, mats, demos] = await Promise.all([
@@ -548,7 +562,9 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
                 <div><label className={label}>Install date</label><input type="date" className={input} value={quote.go_live_date || ''} onChange={e => setQ('go_live_date', e.target.value)} disabled={!canWrite} /></div>
                 <div className="col-span-2"><label className={label}>Payment terms</label><select className={input} value={quote.payment_terms} onChange={e => setQ('payment_terms', e.target.value)} disabled={!canWrite}>
                   <option value="pay_now">Charge full now</option><option value="deposit">Deposit</option><option value="staged">Staged (deposit + milestones)</option><option value="invoice_later">Invoice later</option></select>
-                  {quote.payment_terms === 'staged' && <div className="text-[10px] text-dim mt-1">Set up the deposit + milestones in the <span className="text-ember font-semibold">Payment schedule</span> panel at the top of the quote.</div>}</div>
+                  {quote.payment_terms === 'staged' && <div className="text-[10px] text-dim mt-1">Set up the deposit + milestones in the <span className="text-ember font-semibold">Payment schedule</span> panel at the top of the quote.</div>}
+                  {quote.payment_terms === 'pay_now' && <div className="text-[10px] text-amber-600 font-medium mt-1">Signing charges the customer the FULL {money(customerTotal)} in one payment. For the usual 40/30/30 split, choose Staged.</div>}
+                  {quote.payment_terms === 'staged' && stages.length === 0 && <div className="text-[10px] text-amber-600 font-medium mt-1">No stages configured yet — the quote can't be saved until the schedule totals {money(customerTotal)}.</div>}</div>
                 {quote.payment_terms === 'deposit' && <div className="col-span-2"><label className={label}>Deposit %</label><input type="number" className={input} value={quote.deposit_percent || 0} onChange={e => setQ('deposit_percent', e.target.value)} disabled={!canWrite} /></div>}
               </div>
             </div>

@@ -54,7 +54,7 @@ export default function QuotesPanel({ profile, onNavigate }) {
 
   const createQuote = async () => {
     const { data, error } = await supabase.from('quotes').insert({
-      status: 'draft', created_by: profile.id,
+      status: 'draft', created_by: profile.id, payment_terms: 'staged',
       location_id: newLocation || null, contact_id: newContact || null,
       valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     }).select('id').single();

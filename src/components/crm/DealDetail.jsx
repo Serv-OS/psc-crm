@@ -64,7 +64,7 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
     const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const { data, error } = await supabase.from('quotes').insert({
       deal_id: dealId, company_id: deal.company_id || null, contact_id: contactId, location_id: locationId,
-      tax_rate: 20, payment_terms: 'pay_now', valid_until: validUntil, created_by: profile.id,
+      tax_rate: 20, payment_terms: 'staged', valid_until: validUntil, created_by: profile.id,
     }).select().single();
     if (error) { alert('Could not create quote: ' + error.message); return; }
     onNavigate?.('quote', data.id);

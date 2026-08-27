@@ -220,7 +220,7 @@ export default function PublicQuote({ token }) {
                 : q.payment_terms === 'invoice_later' ? 'Accept & sign'
                 : isStaged ? `Accept, sign & pay deposit (${money(depositStage?.amount || 0)})`
                 : q.payment_terms === 'deposit' ? `Accept, sign & pay ${q.deposit_percent}% deposit`
-                : 'Accept, sign & pay'}
+                : `Accept, sign & pay ${money(q.one_off_total)}`}
             </button>
           </>
         )}
