@@ -9,7 +9,7 @@
 //  - Per product: material = unit_cost x qty, install = install_rate x qty.
 //  - Siding subtotal in the project total is MATERIAL ONLY; per-product install
 //    is rolled up separately as "Install Labor".
-//  - Install-material qty = (sqft / divisor) x stories x mult, ROUNDED to 1 dp,
+//  - Install-material qty = (sqft / divisor) x mult, ROUNDED to 1 dp,
 //    then lineTotal = cost x roundedQty. The rounding is deliberate.
 //  - Permits = sqft x permitsPerSqft, Debris = sqft x debrisPerSqft.
 //  - Demo = sqft x demoRate when a demo type is selected.
