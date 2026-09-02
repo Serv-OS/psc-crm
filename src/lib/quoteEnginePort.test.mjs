@@ -184,3 +184,37 @@ test('guidance range brackets the engine price and rounds outward', () => {
   assert.equal(high % step, 0);
   assert.ok(low >= res.salePrice * (1 - band) - step, 'low rounded further than one step');
 });
+
+/* Storeys must not scale the consumables.
+ *
+ * The field the estimator fills in is TOTAL sq ft of wall, so the same 1000 sq
+ * ft elevation needs the same wrap, tape, sealant and fasteners however many
+ * storeys it spans. The engine used to multiply by storeys, which counted the
+ * same wall twice and quietly doubled a two-storey quote. */
+test('install materials follow sq ft, not storeys', () => {
+  const cfgJs = js.buildEngineConfig(rows);
+  const cfgTs = ts.buildEngineConfig(rows);
+  const at = (engine, cfg, numStories) =>
+    engine.computeQuote(cfg, { totalSqft: 1000, numStories, demoType: '', qty: {} }).installSum;
+
+  const one = at(js, cfgJs, 1);
+  assert.ok(one > 0, 'a single storey must actually cost something');
+  for (const storeys of [2, 3, 4]) {
+    assert.equal(at(js, cfgJs, storeys), one, `${storeys} storeys changed the consumables`);
+    assert.equal(at(ts, cfgTs, storeys), one, `${storeys} storeys drifted in the TS engine`);
+  }
+});
+
+/* The regression that was costing real money: Stories defaults to blank, blank
+ * parsed as 0, and 0 × anything is 0 — so a quote raised without touching the
+ * dropdown left every install consumable out at zero. */
+test('a blank storey count does not zero the consumables', () => {
+  const cfgJs = js.buildEngineConfig(rows);
+  const cfgTs = ts.buildEngineConfig(rows);
+  const base = js.computeQuote(cfgJs, { totalSqft: 1000, numStories: 1, demoType: '', qty: {} }).installSum;
+  for (const blank of ['', null, undefined]) {
+    const inputs = { totalSqft: 1000, numStories: blank, demoType: '', qty: {} };
+    assert.equal(js.computeQuote(cfgJs, inputs).installSum, base, `storeys=${JSON.stringify(blank)} zeroed the quote`);
+    assert.equal(ts.computeQuote(cfgTs, inputs).installSum, base, `storeys=${JSON.stringify(blank)} zeroed the TS quote`);
+  }
+});

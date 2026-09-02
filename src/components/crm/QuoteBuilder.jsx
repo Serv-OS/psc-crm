@@ -469,7 +469,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
             <div className="glass-card rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-bdr flex items-center gap-2">
                 <h3 className="text-sm font-bold text-paper">Install materials</h3>
-                <span className="text-[10px] text-dim">Auto-calculated from sq ft × stories</span>
+                <span className="text-[10px] text-dim">Auto-calculated from sq ft</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

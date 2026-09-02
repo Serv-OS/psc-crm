@@ -6,7 +6,7 @@
  *  - Per product: material = unit_cost × qty, install = install_rate × qty.
  *  - Siding subtotal in the project total is MATERIAL ONLY; per-product install
  *    is rolled up separately as "Install Labor" (matches the source sheet D29).
- *  - Install-material qty = (sqft / divisor) × stories × mult, ROUNDED to 1 dp,
+ *  - Install-material qty = (sqft / divisor) × mult, ROUNDED to 1 dp,
  *    then lineTotal = cost × roundedQty.  (index.html rounds; do not remove it.)
  *  - Permits = sqft × permitsPerSqft, Debris = sqft × debrisPerSqft.
  *  - Demo = sqft × demoRate when a demo type is selected.
@@ -126,7 +126,18 @@ export function computeQuote(cfg, inputs = {}) {
   // === Install materials (auto-calculated qty, rounded to 1 dp) ===
   let installSum = 0;
   const installMatRows = cfg.installMaterials.map((m) => {
-    const rawQty = (totalSqft / cfg.installMatDivisor) * numStories * m.multiplier;
+    // Storeys deliberately do NOT scale this. The field above is TOTAL sq ft of
+    // wall, so a 1000 sq ft elevation needs the same house wrap, tape, sealant
+    // and fasteners whether that wall is one storey or stacked over two —
+    // multiplying by storeys counted the same wall twice.
+    //
+    // It also fixed a quieter, worse bug: Stories defaults to blank, which read
+    // as 0, so a quote raised without picking one silently costed EVERY install
+    // consumable at zero. On 1000 sq ft that is $1,354.89 left out of the quote.
+    //
+    // Access difficulty on a tall wall is real, but it is a LABOUR cost, not a
+    // reason to order twice the nails.
+    const rawQty = (totalSqft / cfg.installMatDivisor) * m.multiplier;
     const q = Math.round(rawQty * 10) / 10; // 1 decimal — matches source tool
     const lineTotal = m.cost * q;
     installSum += lineTotal;

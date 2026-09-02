@@ -172,7 +172,7 @@ export default function PricingCatalogue({ profile }) {
 
           {tab === 'materials' && (
             <div className="glass-card rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 text-[11px] text-dim border-b border-bdr">Quantities auto-calculate as <span className="font-mono">(sq ft ÷ {config.install_mat_divisor}) × stories × multiplier</span> (rounded to 1 dp).</div>
+              <div className="px-4 py-3 text-[11px] text-dim border-b border-bdr">Quantities auto-calculate as <span className="font-mono">(sq ft ÷ {config.install_mat_divisor}) × multiplier</span> (rounded to 1 dp).</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-[10px] uppercase tracking-wider text-dim border-b border-bdr">
@@ -226,7 +226,7 @@ export default function PricingCatalogue({ profile }) {
               <div><label className={label}>Permits per sq ft</label><input type="number" step="0.01" className={input} value={config.permits_per_sqft} onChange={e => setConfig({ ...config, permits_per_sqft: e.target.value })} disabled={!canWrite} /></div>
               <div><label className={label}>Debris removal per sq ft</label><input type="number" step="0.01" className={input} value={config.debris_per_sqft} onChange={e => setConfig({ ...config, debris_per_sqft: e.target.value })} disabled={!canWrite} /></div>
               <div><label className={label}>Install-material divisor</label><input type="number" className={input} value={config.install_mat_divisor} onChange={e => setConfig({ ...config, install_mat_divisor: e.target.value })} disabled={!canWrite} />
-                <div className="text-[10px] text-dim mt-1">Material qty = (sq ft ÷ divisor) × stories × multiplier.</div></div>
+                <div className="text-[10px] text-dim mt-1">Material qty = (sq ft ÷ divisor) × multiplier.</div></div>
             </div>
           )}
         </div>
