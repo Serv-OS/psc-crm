@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SECTIONS, missingRequired } from '../../lib/scopeQuestionnaire';
+import { SECTIONS as SCOPE_SECTIONS, missingRequired as scopeMissing } from '../../lib/scopeQuestionnaire';
 
 // The gate on manual lead creation: the Homeowner Siding Scope-of-Work
 // Questionnaire as a popup. Save stays disabled until every required question
@@ -10,7 +10,17 @@ import { SECTIONS, missingRequired } from '../../lib/scopeQuestionnaire';
 // The same modal edits an existing questionnaire: pass `initial` and the
 // answers arrive pre-filled.
 
-export default function ScopeQuestionnaireModal({ leadName, initial, onComplete, onCancel }) {
+// Now drives BOTH questionnaires. The intro call and the scope of work are
+// different documents asked at different times, but they are the same shape, so
+// the form that renders them should be one component rather than two that drift.
+export default function ScopeQuestionnaireModal({
+  leadName, initial, onComplete, onCancel,
+  sections = SCOPE_SECTIONS, missingFn = scopeMissing,
+  title = 'Scope-of-work questionnaire',
+  subtitle = 'establishes expectations and separates included work from allowances and exclusions.',
+}) {
+  const SECTIONS = sections;
+  const missingRequired = missingFn;
   const [answers, setAnswers] = useState(() => initial || {});
   const [active, setActive] = useState(SECTIONS[0].key);
   const [showMissing, setShowMissing] = useState(false);
@@ -87,10 +97,10 @@ export default function ScopeQuestionnaireModal({ leadName, initial, onComplete,
 
         <div className="px-5 py-4 border-b border-bdr flex items-center gap-3 shrink-0">
           <div>
-            <div className="text-base font-bold text-paper">Scope-of-work questionnaire</div>
+            <div className="text-base font-bold text-paper">{title}</div>
             <div className="text-xs text-muted">
               {leadName ? <>Required before <span className="text-paper font-medium">{leadName}</span> can be created — </> : null}
-              establishes expectations and separates included work from allowances and exclusions.
+              {subtitle}
             </div>
           </div>
           <div className={`ml-auto text-xs font-mono px-2.5 py-1 rounded-lg shrink-0 ${
