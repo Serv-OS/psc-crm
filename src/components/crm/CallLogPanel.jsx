@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { PhoneCall, PhoneIncoming, PhoneOutgoing, PhoneMissed, Voicemail } from 'lucide-react';
 import CallButton from '../CallButton.jsx';
 
+import { digits10, contactForCall } from '../../lib/callMatch';
 const fmtWhen = (d) => new Date(d).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const fmtDur = (s) => { const n = Number(s) || 0; return n >= 60 ? `${Math.floor(n / 60)}m ${n % 60}s` : `${n}s`; };
 
@@ -64,18 +65,11 @@ export default function CallLogPanel({ profile, onNavigate }) {
     const p = people.find(x => x.id === id);
     return p ? (p.display_name || p.email) : null;
   };
-  const digits10 = (s) => (s || '').replace(/\D/g, '').slice(-10);
+
   // Resolve the contact for a call: by linked contact_id first, else by matching
   // the call's number (last 10 digits) against contacts' phone/mobile — so calls
   // logged before contact-linking (or stored in any format) still show the name.
-  const contactOf = (a) => {
-    if (a.contact_id) { const c = contacts.find(x => x.id === a.contact_id); if (c) return c; }
-    const md = a.channel_metadata || {};
-    const num = a.direction === 'inbound' ? md.from_number : (md.to_number || md.from_number);
-    const d = digits10(num);
-    if (d.length === 10) return contacts.find(c => digits10(c.phone) === d) || null;
-    return null;
-  };
+  const contactOf = (a) => contactForCall(a, contacts);
 
   // Create a contact straight from a call, then adopt every other call from the
   // same number so the whole history shows the name, not just this row.
