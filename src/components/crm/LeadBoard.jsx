@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import DisqualifyDialog from './DisqualifyDialog.jsx';
 import ScopeQuestionnaireModal from './ScopeQuestionnaireModal.jsx';
 import { summarize, SCOPE_KIND } from '../../lib/scopeQuestionnaire';
 
@@ -167,10 +168,16 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
     }
   };
 
-  const disqualify = async (lead) => {
-    const reason = prompt('Disqualification reason:');
-    if (reason === null) return;
+  // 12 Nov 2026: a picked reason (five for a construction company, or Other typed) instead of
+  // a browser prompt. The stage change is recorded like Qualify, so the dashboard counts it.
+  const [dqFor, setDqFor] = useState(null);
+  const disqualify = (lead) => setDqFor(lead);
+  const confirmDisqualify = async (reason) => {
+    const lead = dqFor;
+    if (!lead) return;
     await supabase.from('leads').update({ stage: 'disqualified', disqualified_reason: reason }).eq('id', lead.id);
+    await supabase.from('stage_history').insert({ object_type: 'lead', object_id: lead.id, from_stage: lead.stage, to_stage: 'disqualified', changed_by: profile.id });
+    setDqFor(null);
     load();
   };
 
@@ -265,6 +272,7 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
 
   return (
     <div className="h-full flex flex-col">
+      {dqFor && <DisqualifyDialog leadName={dqFor.name} onCancel={() => setDqFor(null)} onConfirm={confirmDisqualify} />}
       <div className="px-6 py-4 border-b border-bdr flex items-center justify-between">
         <div>
           <div className="text-lg font-bold text-paper">Leads</div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DisqualifyDialog from './DisqualifyDialog.jsx';
 import { supabase } from '../../lib/supabase';
 import TimerButton from './TimerButton.jsx';
 import ActivityTimeline from './ActivityTimeline.jsx';
@@ -112,10 +113,14 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
     }
   };
 
-  const disqualify = async () => {
-    const reason = prompt('Disqualification reason:');
-    if (reason === null) return;
+  // 12 Nov 2026: a picked reason (five for a construction company, or Other typed) instead of
+  // a browser prompt. The stage change is recorded like Qualify, so the dashboard counts it.
+  const [dqOpen, setDqOpen] = useState(false);
+  const disqualify = () => setDqOpen(true);
+  const confirmDisqualify = async (reason) => {
     await supabase.from('leads').update({ stage: 'disqualified', disqualified_reason: reason }).eq('id', leadId);
+    await supabase.from('stage_history').insert({ object_type: 'lead', object_id: leadId, from_stage: lead?.stage ?? null, to_stage: 'disqualified', changed_by: profile.id });
+    setDqOpen(false);
     load();
   };
 
@@ -159,6 +164,8 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
           </div>
         )}
       </div>
+
+      {dqOpen && <DisqualifyDialog leadName={lead.name} onCancel={() => setDqOpen(false)} onConfirm={confirmDisqualify} />}
 
       {/* Stage bar */}
       {canWrite && lead.stage !== 'disqualified' && (
