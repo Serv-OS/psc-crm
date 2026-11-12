@@ -405,7 +405,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
                 <div><label className={label}>Total sq ft</label><input type="number" min="0" className={input} value={totalSqft} onChange={e => setTotalSqft(e.target.value)} placeholder="0" disabled={!canWrite} /></div>
                 <div><label className={label}>Stories</label>
                   <select className={input} value={numStories} onChange={e => setNumStories(e.target.value)} disabled={!canWrite}>
-                    <option value="">—</option>{[1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
+                    <option value="">—</option>{[1, 1.5, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
                   </select></div>
                 <div><label className={label}>Demo required</label>
                   <select className={input} value={demoType} onChange={e => setDemoType(e.target.value)} disabled={!canWrite}>

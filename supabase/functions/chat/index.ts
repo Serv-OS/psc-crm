@@ -519,7 +519,7 @@ serve(async (req) => {
           type: "object",
           properties: {
             sqft: { type: "number", description: "Wall area to be covered, in square feet." },
-            stories: { type: "number", description: "Number of storeys (1, 2 or 3)." },
+            stories: { type: "number", description: "Number of storeys (1, 1.5, 2 or 3). A storey and a half is 1.5." },
             demoType: {
               type: "string", enum: ["siding", "stucco", "trim", "newbuild"],
               description: "What is being removed first. 'newbuild' if there is nothing to strip off.",

@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -199,7 +199,7 @@ test('install materials follow sq ft, not storeys', () => {
 
   const one = at(js, cfgJs, 1);
   assert.ok(one > 0, 'a single storey must actually cost something');
-  for (const storeys of [2, 3, 4]) {
+  for (const storeys of [1.5, 2, 3, 4]) {
     assert.equal(at(js, cfgJs, storeys), one, `${storeys} storeys changed the consumables`);
     assert.equal(at(ts, cfgTs, storeys), one, `${storeys} storeys drifted in the TS engine`);
   }
@@ -217,4 +217,25 @@ test('a blank storey count does not zero the consumables', () => {
     assert.equal(js.computeQuote(cfgJs, inputs).installSum, base, `storeys=${JSON.stringify(blank)} zeroed the quote`);
     assert.equal(ts.computeQuote(cfgTs, inputs).installSum, base, `storeys=${JSON.stringify(blank)} zeroed the TS quote`);
   }
+});
+
+/* 12 Nov 2026: a storey and a half (a Cape Cod, a bungalow with a dormered
+ * roof) is a real house on the Peninsula. It is offered as 1.5 everywhere a
+ * storey count is picked, it is kept as 1.5 on the estimate, and it prices
+ * exactly like any other storey count: the consumables follow sq ft. */
+test('a storey and a half is offered, kept and priced from sq ft', () => {
+  const cfgJs = js.buildEngineConfig(rows);
+  const cfgTs = ts.buildEngineConfig(rows);
+  const inputs = { totalSqft: 1000, numStories: 1.5, demoType: '', qty: {} };
+  const one = js.computeQuote(cfgJs, { ...inputs, numStories: 1 });
+  for (const [name, engine, cfg] of [['js', js, cfgJs], ['ts', ts, cfgTs]]) {
+    const half = engine.computeQuote(cfg, inputs);
+    assert.equal(half.numStories, 1.5, `${name}: the storey count was not kept as 1.5`);
+    assert.equal(half.installSum, one.installSum, `${name}: 1.5 storeys changed the consumables`);
+    assert.equal(half.totalCost, one.totalCost, `${name}: 1.5 storeys changed the cost`);
+  }
+  const builder = readFileSync(new URL('../components/crm/QuoteBuilder.jsx', import.meta.url), 'utf8');
+  assert.ok(builder.includes('[1, 1.5, 2, 3, 4].map('), 'the Stories picker lost the 1.5 option');
+  const chat = readFileSync(new URL('../../supabase/functions/chat/index.ts', import.meta.url), 'utf8');
+  assert.ok(chat.includes('(1, 1.5, 2 or 3)'), 'the sales chat no longer knows about 1.5 storeys');
 });
