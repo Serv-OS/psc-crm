@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { handleClosedWon } from '../../lib/dealHelpers';
 import { buildEngineConfig, computeQuote, buildEstimateRecord } from '../../lib/quoteEngine';
+import { pickOptions, picksToQty, qtyToPicks, quickLines, isPerSqft, autoTrimLengths } from '../../lib/quickEstimate';
 
 const STATUS_STYLES = {
   draft: 'bg-slate-100 text-slate-600 border border-slate-200',
@@ -35,6 +36,12 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
   const [markup, setMarkup] = useState('');
   const [qty, setQty] = useState({}); // { [productId]: value }
   const [customItems, setCustomItems] = useState([]); // [{ key, name, unit, cost, installRate, qty }]
+  // Quick estimate (Steve, 18 Nov 2026): sq ft + dropdowns, one total per pick.
+  // Old quotes stay on the detailed table so reopening them never reprices.
+  const [mode, setMode] = useState('quick');
+  const [picks, setPicks] = useState({ siding: '', trim: '', trimLengths: '', extras: {} });
+  const [rawProducts, setRawProducts] = useState([]);
+  const [trimPer, setTrimPer] = useState(25);
   const [stages, setStages] = useState([]); // payment schedule: [{ key, id?, name, basis, value, is_deposit, status?, invoice? }]
 
   const canWrite = profile.role === 'owner' || profile.role === 'editor';
@@ -69,6 +76,8 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
       installMaterials: mats.data || [], demoRates: demos.data || [],
     });
     setCfg(engineCfg);
+    setRawProducts(prods.data || []);
+    setTrimPer(Number(conf.data?.trim_sqft_per_length) || 25);
 
     supabase.from('locations').select('id, name, city').order('name').limit(200).then(r => setLocations(r.data || []));
     if (q.data?.location_id) supabase.from('locations').select('id, name, city').eq('id', q.data.location_id).single().then(r => setLocation(r.data));
@@ -102,6 +111,8 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
       }
     }
     setQty(restoredQty);
+    setMode(inp.mode || (est ? 'detailed' : 'quick'));
+    setPicks(inp.picks ? { siding: '', trim: '', trimLengths: '', extras: {}, ...inp.picks } : qtyToPicks(restoredQty, prods.data || []));
     setCustomItems((inp.customItems || []).map((c, i) => ({ key: `c${i}`, name: c.name || '', unit: c.unit || '', cost: c.cost ?? '', installRate: c.installRate ?? '', qty: c.qty ?? '' })));
 
     // Payment schedule (staged billing) + each stage's invoice/charge status
@@ -129,10 +140,29 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
     setQ('terms', data.quote_terms);
   };
 
+  const quick = mode === 'quick';
+  const effQty = useMemo(() => (quick ? picksToQty(picks, rawProducts, totalSqft, trimPer) : qty), [quick, picks, rawProducts, totalSqft, trimPer, qty]);
   const result = useMemo(() => {
     if (!cfg) return null;
-    return computeQuote(cfg, { totalSqft, numStories, demoType, markup, qty, customItems });
-  }, [cfg, totalSqft, numStories, demoType, markup, qty, customItems]);
+    return computeQuote(cfg, { totalSqft, numStories, demoType, markup, qty: effQty, customItems: quick ? [] : customItems });
+  }, [cfg, totalSqft, numStories, demoType, markup, effQty, quick, customItems]);
+  const options = useMemo(() => pickOptions(rawProducts), [rawProducts]);
+  const pickLines = useMemo(() => (result && quick ? quickLines(result, picks, rawProducts) : []), [result, quick, picks, rawProducts]);
+
+  // Switching keeps what is there: quick -> detailed copies the worked out
+  // quantities into the table; detailed -> quick guesses the picks from it.
+  const switchMode = (m) => {
+    if (m === mode) return;
+    if (m === 'detailed') setQty(Object.fromEntries(Object.entries(effQty).map(([k, v]) => [k, String(v)])));
+    else setPicks(qtyToPicks(qty, rawProducts));
+    setMode(m);
+  };
+  const setPick = (patch) => setPicks((p) => ({ ...p, ...patch }));
+  const toggleExtra = (id) => setPicks((p) => {
+    const extras = { ...(p.extras || {}) };
+    if (id in extras) delete extras[id]; else extras[id] = '';
+    return { ...p, extras };
+  });
 
   const termsWords = (quote?.terms || '').trim() ? (quote.terms.trim().split(/\s+/).length) : 0;
   const taxRate = Number(quote?.tax_rate) || 0;
@@ -167,6 +197,14 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
     const mk = res.markup;
     const lines = [];
     let sort = 0;
+    // Quick estimate: one line per pick, its total only (no quantity or unit price).
+    if (quick) {
+      return quickLines(res, picks, rawProducts).filter(l => l.cost > 0).map(l => ({
+        product_id: null, name: l.name, description: null,
+        category: 'services', billing_type: 'one_off',
+        qty: 1, unit_price: l.cost * mk, discount: 0, tax_rate: taxRate, line_total: l.cost * mk, sort: sort++,
+      }));
+    }
     res.productRows.filter(r => r.qty > 0).forEach(r => {
       const lineCustomer = r.lineTotal * mk;
       lines.push({
@@ -242,7 +280,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
       quote_id: quoteId,
       total_sqft: result.totalSqft, num_stories: result.numStories,
       demo_type: result.demoType || null, markup: result.markup,
-      inputs: { totalSqft: result.totalSqft, numStories: result.numStories, demoType: result.demoType, markup: result.markup, qty, customItems: customItems.map(c => ({ name: c.name, unit: c.unit, cost: Number(c.cost) || 0, installRate: Number(c.installRate) || 0, qty: Number(c.qty) || 0 })) },
+      inputs: { mode, picks: quick ? picks : undefined, totalSqft: result.totalSqft, numStories: result.numStories, demoType: result.demoType, markup: result.markup, qty: quick ? effQty : qty, customItems: (quick ? [] : customItems).map(c => ({ name: c.name, unit: c.unit, cost: Number(c.cost) || 0, installRate: Number(c.installRate) || 0, qty: Number(c.qty) || 0 })) },
       siding_material: result.sidingMaterialSum, siding_install: result.sidingInstallSum, install_mat_sum: result.installSum,
       demo_cost: result.demoCost, permits_cost: result.permitsCost, debris_cost: result.debrisCost,
       total_cost: result.totalCost, sale_price: result.salePrice, profit: result.profit, margin: result.margin,
@@ -416,7 +454,81 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
               </div>
             </div>
 
+            {/* How the estimate is built */}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-xl border border-bdr overflow-hidden text-xs font-semibold">
+                {[['quick', 'Quick estimate'], ['detailed', 'Detailed']].map(([k, l]) => (
+                  <button key={k} onClick={() => canWrite && switchMode(k)} disabled={!canWrite}
+                    className={`px-3 py-1.5 ${mode === k ? 'bg-ember text-white' : 'text-muted hover:text-paper'}`}>{l}</button>
+                ))}
+              </div>
+              <span className="text-[10px] text-dim">{quick ? 'Pick from the dropdowns, sq ft does the rest. The customer sees one total per pick.' : 'Every product with a quantity. The customer sees each line.'}</span>
+            </div>
+
+            {quick && (
+              <div className="glass-card rounded-2xl p-4 space-y-4">
+                {!(Number(totalSqft) > 0) && <div className="text-xs text-amber-600">Type the total sq ft above first.</div>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div><label className={label}>Install Siding Product</label>
+                    <select className={input} value={picks.siding} onChange={e => setPick({ siding: e.target.value })} disabled={!canWrite}>
+                      <option value="">None</option>
+                      {options.siding.map(p => <option key={p.id} value={p.id}>{p.name.trim()}</option>)}
+                    </select>
+                    {picks.siding && Number(totalSqft) > 0 && <div className="text-[10px] text-dim mt-1">{Number(totalSqft).toLocaleString()} sq ft{result.productRows.some(r => r.auto && r.qty > 0) ? `, plus ${result.productRows.filter(r => r.auto && r.qty > 0).map(r => `${r.qty} battens`).join(', ')}` : ''}, with install materials, permits and debris removal</div>}
+                  </div>
+                  <div><label className={label}>Install Siding Trim</label>
+                    <div className="flex gap-2">
+                      <select className={input} value={picks.trim} onChange={e => setPick({ trim: e.target.value })} disabled={!canWrite}>
+                        <option value="">None</option>
+                        {options.trim.map(p => <option key={p.id} value={p.id}>{p.name.trim()}</option>)}
+                      </select>
+                      {picks.trim && <div className="w-20 shrink-0"><input type="number" min="0" className={input} value={picks.trimLengths} onChange={e => setPick({ trimLengths: e.target.value })}
+                        placeholder={String(autoTrimLengths(totalSqft, trimPer))} title="Trim lengths" disabled={!canWrite} /></div>}
+                    </div>
+                    {picks.trim && <div className="text-[10px] text-dim mt-1">{String(picks.trimLengths).trim() ? `${picks.trimLengths} lengths, typed` : `${autoTrimLengths(totalSqft, trimPer)} lengths, 1 per ${trimPer} sq ft. Type a number to change it.`}</div>}
+                  </div>
+                </div>
+                <div>
+                  <label className={label}>Other items</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {options.extra.map(p => {
+                      const on = p.id in (picks.extras || {});
+                      const perSq = isPerSqft(p);
+                      return (
+                        <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${on ? 'border-ember bg-card' : 'border-bdr'}`}>
+                          <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer text-sm text-paper">
+                            <input type="checkbox" checked={on} onChange={() => toggleExtra(p.id)} disabled={!canWrite} />
+                            <span className="truncate">{p.name.trim()}</span>
+                          </label>
+                          {on && <input type="number" min="0" className={cell + ' w-20 text-right'} value={picks.extras[p.id]}
+                            onChange={e => setPick({ extras: { ...picks.extras, [p.id]: e.target.value } })} placeholder={perSq ? String(Number(totalSqft) || 0) : '1'}
+                            title={perSq ? 'Sq ft (blank = all of it)' : 'How many (blank = 1)'} disabled={!canWrite} />}
+                          {on && <span className="text-[10px] text-dim w-8">{perSq ? 'sq ft' : (p.unit_label || '').trim().toLowerCase() === 'per length' ? 'lengths' : 'qty'}</span>}
+                        </div>
+                      );
+                    })}
+                    {!options.extra.length && <div className="text-xs text-dim">No other items yet. Set them in Settings, Pricing catalogue.</div>}
+                  </div>
+                </div>
+                {pickLines.length > 0 && (
+                  <div className="border-t border-bdr pt-3">
+                    <div className={label}>What the customer sees</div>
+                    <table className="w-full text-sm"><tbody>
+                      {pickLines.map(l => (
+                        <tr key={l.key} className="border-b border-bdr/50 last:border-0">
+                          <td className="py-1.5 text-paper">{l.name}</td>
+                          <td className="py-1.5 text-right font-mono text-paper">{money(l.cost * result.markup)}</td>
+                        </tr>
+                      ))}
+                      <tr><td className="pt-2 font-semibold text-paper">Total before tax</td><td className="pt-2 text-right font-mono font-bold text-paper">{money(result.salePrice)}</td></tr>
+                    </tbody></table>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Siding products */}
+            {!quick && (
             <div className="glass-card rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-bdr flex items-center gap-2">
                 <h3 className="text-sm font-bold text-paper">Siding products</h3>
@@ -464,6 +576,7 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
                 </table>
               </div>
             </div>
+            )}
 
             {/* Install materials (auto) */}
             <div className="glass-card rounded-2xl overflow-hidden">

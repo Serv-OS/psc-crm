@@ -118,9 +118,6 @@ export default function PublicQuote({ token }) {
           <thead>
             <tr className="text-[10px] font-bold uppercase tracking-wide text-slate-400 border-b border-slate-200">
               <th className="text-left py-2">Item</th>
-              <th className="text-center py-2 w-12">Qty</th>
-              <th className="text-right py-2 w-20">Unit</th>
-              <th className="text-right py-2 w-14">Disc</th>
               <th className="text-right py-2 w-24">Total</th>
             </tr>
           </thead>
@@ -132,9 +129,6 @@ export default function PublicQuote({ token }) {
                   {it.description && <div className="text-xs text-slate-500 mt-0.5 whitespace-pre-line">{it.description}</div>}
                   <div className="text-[10px] text-slate-400 mt-0.5">{CAT[it.category]}{it.billing_type === 'monthly' ? ' · billed monthly' : it.billing_type === 'annual' ? ' · billed annually' : ''}</div>
                 </td>
-                <td className="py-2.5 text-center text-slate-600">{it.qty}</td>
-                <td className="py-2.5 text-right text-slate-600">{money(it.unit_price)}</td>
-                <td className="py-2.5 text-right text-slate-500">{it.discount > 0 ? `${it.discount}%` : '—'}</td>
                 <td className="py-2.5 text-right font-mono text-slate-800">{money(it.line_total)}{it.billing_type === 'monthly' ? '/mo' : it.category === 'payments' ? '/yr' : ''}</td>
               </tr>
             ))}

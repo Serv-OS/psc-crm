@@ -75,12 +75,13 @@ export default function PricingCatalogue({ profile }) {
       permits_per_sqft: num(config.permits_per_sqft),
       debris_per_sqft: num(config.debris_per_sqft),
       install_mat_divisor: num(config.install_mat_divisor) || 1000,
+      trim_sqft_per_length: num(config.trim_sqft_per_length) || 25,
       updated_at: new Date().toISOString(),
     });
     if (cfg.error) errors.push(`Rates: ${cfg.error.message}`);
 
     const tables = [
-      ['quote_config_products', products, (r) => ({ name: r.name, type: r.type || 'sqft', unit_cost: num(r.unit_cost), install_rate: num(r.install_rate), unit_label: r.unit_label, active: r.active !== false })],
+      ['quote_config_products', products, (r) => ({ name: r.name, type: r.type || 'sqft', unit_cost: num(r.unit_cost), install_rate: num(r.install_rate), unit_label: r.unit_label, estimate_group: r.estimate_group || null, active: r.active !== false })],
       ['quote_config_install_materials', materials, (r) => ({ name: r.name, cost: num(r.cost), mult: num(r.mult), active: r.active !== false })],
       ['quote_config_demo_rates', demo, (r) => ({ label: r.label, rate_per_sqft: num(r.rate_per_sqft), active: r.active !== false })],
     ];
@@ -137,11 +138,11 @@ export default function PricingCatalogue({ profile }) {
         <div className="max-w-[1100px]">
           {tab === 'products' && (
             <div className="glass-card rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 text-[11px] text-dim border-b border-bdr">Type drives the estimator: <span className="font-mono">batten</span> rows are auto-quantified (one batten per 12&quot; of matching panel) — the others just price per unit. Recreating a batten product as <span className="font-mono">sqft</span> silently kills the auto-batten rule.</div>
+              <div className="px-4 py-3 text-[11px] text-dim border-b border-bdr">Type drives the estimator: <span className="font-mono">batten</span> rows are auto-quantified (one batten per 12&quot; of matching panel) — the others just price per unit. Recreating a batten product as <span className="font-mono">sqft</span> silently kills the auto-batten rule. <span className="font-mono">each</span> items count one. Estimate dropdown puts a product in the quick estimate: Siding product, Siding trim or Other item.</div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="text-[10px] uppercase tracking-wider text-dim border-b border-bdr">
-                    <th className="text-left px-3 py-2">Product</th><th className="px-2 py-2 w-24">Type</th><th className="px-2 py-2 w-24">Unit</th>
+                    <th className="text-left px-3 py-2">Product</th><th className="px-2 py-2 w-24">Type</th><th className="px-2 py-2 w-24">Unit</th><th className="px-2 py-2 w-36">Estimate dropdown</th>
                     <th className="text-right px-2 py-2 w-28">Unit cost</th><th className="text-right px-2 py-2 w-28">Install/unit</th>
                     <th className="text-center px-2 py-2 w-20">Active</th>
                   </tr></thead>
@@ -158,6 +159,14 @@ export default function PricingCatalogue({ profile }) {
                           </select>
                         </td>
                         <td className="px-2 py-2"><input className={cell + ' w-20'} value={p.unit_label || ''} onChange={e => upd(setProducts, products, i, { unit_label: e.target.value })} placeholder="SQFT" disabled={!canWrite} /></td>
+                        <td className="px-2 py-2">
+                          <select className={cell + ' w-36'} value={p.estimate_group || ''} onChange={e => upd(setProducts, products, i, { estimate_group: e.target.value || null })} disabled={!canWrite}>
+                            <option value="">Not in a dropdown</option>
+                            <option value="siding">Siding product</option>
+                            <option value="trim">Siding trim</option>
+                            <option value="extra">Other item</option>
+                          </select>
+                        </td>
                         <td className="px-2 py-2"><input type="number" step="0.01" className={cell + ' w-24 text-right'} value={p.unit_cost} onChange={e => upd(setProducts, products, i, { unit_cost: e.target.value })} disabled={!canWrite} /></td>
                         <td className="px-2 py-2"><input type="number" step="0.01" className={cell + ' w-24 text-right'} value={p.install_rate} onChange={e => upd(setProducts, products, i, { install_rate: e.target.value })} disabled={!canWrite} /></td>
                         <td className="px-2 py-2 text-center"><input type="checkbox" checked={p.active !== false} onChange={e => upd(setProducts, products, i, { active: e.target.checked })} disabled={!canWrite} /></td>
@@ -225,6 +234,8 @@ export default function PricingCatalogue({ profile }) {
                 <div className="text-[10px] text-dim mt-1">Sale price = total cost × markup. Quoters can override per quote.</div></div>
               <div><label className={label}>Permits per sq ft</label><input type="number" step="0.01" className={input} value={config.permits_per_sqft} onChange={e => setConfig({ ...config, permits_per_sqft: e.target.value })} disabled={!canWrite} /></div>
               <div><label className={label}>Debris removal per sq ft</label><input type="number" step="0.01" className={input} value={config.debris_per_sqft} onChange={e => setConfig({ ...config, debris_per_sqft: e.target.value })} disabled={!canWrite} /></div>
+              <div><label className={label}>Sq ft per trim length</label><input type="number" step="1" min="1" className={input} value={config.trim_sqft_per_length ?? 25} onChange={e => setConfig({ ...config, trim_sqft_per_length: e.target.value })} disabled={!canWrite} />
+                <div className="text-[10px] text-dim mt-1">Quick estimate: trim lengths = sq ft ÷ this, rounded up. The quoter can type a number instead.</div></div>
               <div><label className={label}>Install-material divisor</label><input type="number" className={input} value={config.install_mat_divisor} onChange={e => setConfig({ ...config, install_mat_divisor: e.target.value })} disabled={!canWrite} />
                 <div className="text-[10px] text-dim mt-1">Material qty = (sq ft ÷ divisor) × multiplier.</div></div>
             </div>
