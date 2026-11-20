@@ -7,6 +7,7 @@ import AssociationManager from './AssociationManager.jsx';
 import ScopeCard from './ScopeCard.jsx';
 import PreQualCard from './PreQualCard.jsx';
 import AttachmentsCard from './AttachmentsCard.jsx';
+import HouseResearchCard from './HouseResearchCard.jsx';
 import CallButton from '../CallButton.jsx';
 import ScheduleMeeting from './ScheduleMeeting.jsx';
 import LeadBadge from './LeadBadge.jsx';
@@ -60,7 +61,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
     setMembers(m.data || []);
     // Linked records still fetched for the header Call button
     if (l.data?.company_id) supabase.from('companies').select('id, name, phone, domain').eq('id', l.data.company_id).single().then(r => setCompany(r.data)); else setCompany(null);
-    if (l.data?.location_id) supabase.from('locations').select('id, name, phone, city, venue_type').eq('id', l.data.location_id).single().then(r => setLocation(r.data)); else setLocation(null);
+    if (l.data?.location_id) supabase.from('locations').select('id, name, phone, address, city, venue_type').eq('id', l.data.location_id).single().then(r => setLocation(r.data)); else setLocation(null);
     if (l.data?.contact_id) supabase.from('contacts').select('id, first_name, last_name, phone, email').eq('id', l.data.contact_id).single().then(r => setContact(r.data)); else setContact(null);
     if (l.data?.deal_id) supabase.from('deals').select('*').eq('id', l.data.deal_id).single().then(r => setDeal(r.data)); else setDeal(null);
     if (l.data) { await ensureAssociations(l.data); setReady(true); }
@@ -230,6 +231,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                 </div>
               </Card>
 
+              {location && <HouseResearchCard locationId={location.id} address={location.address} profile={profile} />}
               <AttachmentsCard subjectType="lead" subjectId={leadId} profile={profile} />
             </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import TimerButton from './TimerButton.jsx';
+import HouseResearchCard from './HouseResearchCard.jsx';
 import AttachmentsCard from './AttachmentsCard.jsx';
 import AssociationManager from './AssociationManager.jsx';
 import { PROPERTY_TYPES, propertyTypeLabel } from '../../lib/propertyTypes';
@@ -218,6 +219,7 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
                   {location.notes && <Field label="Notes" value={location.notes} />}
                 </div>
               </Card>
+              <HouseResearchCard locationId={locationId} address={location.address} profile={profile} />
             </div>
 
             {/* MIDDLE: Activity + Contacts */}
