@@ -43,7 +43,10 @@ async function google(key: string, address: string) {
   const facts: Record<string, unknown> = {};
   const geo = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${key}`).then((r) => r.json());
   const hit = geo.results?.[0];
-  if (!hit) throw new Error(`Google could not find "${address}" (${geo.status}).`);
+  if (!hit) {
+    if (geo.status === "REQUEST_DENIED") throw new Error(`Google refused the CRM's key: ${geo.error_message || "no reason given"}`);
+    throw new Error(`Google could not find "${address}" (${geo.status}).`);
+  }
   const pos = hit.geometry.location as { lat: number; lng: number };
   facts.position = pos;
   facts.formatted_address = hit.formatted_address;
@@ -271,7 +274,8 @@ serve(async (req) => {
     if (!loc) return json({ error: "Property not found" }, 404);
     if (!String(loc.address || "").trim()) return json({ error: "Add the property's address first." }, 422);
 
-    const gkey = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    // Pasted keys can carry spaces or quote marks.
+    const gkey = (Deno.env.get("GOOGLE_MAPS_API_KEY") || "").trim().replace(/^["']+|["']+$/g, "");
     if (!gkey) return json({ error: "Google Maps is not set up for the CRM yet." }, 503);
     const { data: cfg } = await supabase.from("ai_settings").select("api_key, enabled").eq("id", 1).maybeSingle();
     if (!cfg?.api_key) return json({ error: "Add your Anthropic API key in Settings, AI Assistant." }, 400);
