@@ -14,8 +14,7 @@ import LeadBadge from './LeadBadge.jsx';
 import { LEAD_STAGES, LEAD_STAGE_MAP } from '../../lib/leadStages';
 
 const STAGE_FLOW = ['new_lead', 'attempting', 'contacted', 'qualified'];
-const SOURCE_OPTIONS = ['website', 'referral', 'cold_outreach', 'event', 'trade_show', 'social', 'inbound_call', 'inbound_email', 'pos_review_site', 'partner', 'other'];
-const VENUE_TYPES = ['restaurant', 'bar', 'cafe', 'fast_casual', 'qsr', 'hotel_fb', 'nightclub', 'food_hall', 'catering', 'other'];
+import { sourceOptions, sourceLabel } from '../../lib/leadSources';
 
 export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
   const [lead, setLead] = useState(null);
@@ -82,8 +81,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
   const save = async () => {
     const patch = {
       name: draft.name, source: draft.source || null, priority: draft.priority,
-      venue_type: draft.venue_type || null, covers: draft.covers ? parseInt(draft.covers) : null,
-      current_pos: draft.current_pos || null, next_action: draft.next_action || null,
+      next_action: draft.next_action || null,
       next_action_date: draft.next_action_date || null, notes: draft.notes || null,
       owner_id: draft.owner_id || null,
     };
@@ -195,16 +193,12 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                 <div><label className={label}>Name</label><input className={input} value={draft.name || ''} onChange={e => set('name', e.target.value)} /></div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className={label}>Source</label><select className={input} value={draft.source || ''} onChange={e => set('source', e.target.value)}>
-                    <option value="">--</option>{SOURCE_OPTIONS.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</select></div>
+                    <option value="">--</option>{sourceOptions(draft.source).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></div>
                   <div><label className={label}>Priority</label><select className={input} value={draft.priority || 'medium'} onChange={e => set('priority', e.target.value)}>
                     <option value="hot">Hot</option><option value="warm">Warm</option><option value="medium">Medium</option><option value="cold">Cold</option></select></div>
-                  <div><label className={label}>Venue type</label><select className={input} value={draft.venue_type || ''} onChange={e => set('venue_type', e.target.value)}>
-                    <option value="">--</option>{VENUE_TYPES.map(v => <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>)}</select></div>
-                  <div><label className={label}>Covers</label><input type="number" className={input} value={draft.covers || ''} onChange={e => set('covers', e.target.value)} /></div>
-                  <div><label className={label}>Current POS</label><input className={input} value={draft.current_pos || ''} onChange={e => set('current_pos', e.target.value)} /></div>
                   <div><label className={label}>Owner</label><select className={input} value={draft.owner_id || ''} onChange={e => set('owner_id', e.target.value || null)}>
                     <option value="">Unassigned</option>{members.map(m => <option key={m.id} value={m.id}>{m.display_name || m.email}</option>)}</select></div>
-                  <div><label className={label}>Next action</label><input className={input} value={draft.next_action || ''} onChange={e => set('next_action', e.target.value)} placeholder="e.g. Book demo" /></div>
+                  <div><label className={label}>Next action</label><input className={input} value={draft.next_action || ''} onChange={e => set('next_action', e.target.value)} placeholder="e.g. Site visit to measure" /></div>
                   <div><label className={label}>Next action date</label><input type="date" className={input} value={draft.next_action_date || ''} onChange={e => set('next_action_date', e.target.value)} /></div>
                 </div>
                 <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={3} value={draft.notes || ''} onChange={e => set('notes', e.target.value)} /></div>
@@ -218,11 +212,8 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
             <div className="col-span-4 space-y-4">
               <Card title="Lead Info">
                 <div className="space-y-3">
-                  <Field label="Source" value={lead.source?.replace(/_/g, ' ')} />
+                  <Field label="Source" value={sourceLabel(lead.source)} />
                   <Field label="Priority" value={lead.priority} />
-                  <Field label="Venue type" value={lead.venue_type?.replace(/_/g, ' ')} />
-                  <Field label="Covers" value={lead.covers} />
-                  <Field label="Current POS" value={lead.current_pos} />
                   <Field label="Next action" value={[lead.next_action, lead.next_action_date].filter(Boolean).join(' / ')} />
                   <Field label="Owner" value={ownerName(lead.owner_id)} />
                   <Field label="Created" value={new Date(lead.created_at).toLocaleDateString('en-US', { day:'numeric', month:'short', year:'2-digit' })} />

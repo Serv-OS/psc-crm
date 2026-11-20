@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 
 const LEAD_DEFAULT_FIELDS = [
-  { key: 'company', label: 'Restaurant / Company', type: 'text', required: false, maps_to: 'company_name' },
+  { key: 'company', label: 'Company (if any)', type: 'text', required: false, maps_to: 'company_name' },
   { key: 'first_name', label: 'First name', type: 'text', required: true, maps_to: 'first_name' },
   { key: 'last_name', label: 'Last name', type: 'text', required: false, maps_to: 'last_name' },
   { key: 'email', label: 'Email', type: 'email', required: true, maps_to: 'email' },

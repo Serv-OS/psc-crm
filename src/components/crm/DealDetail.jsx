@@ -251,7 +251,7 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
                         className="p-3 glass-inner rounded-xl cursor-pointer flex items-center gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-paper">Quote #{q.quote_number}</div>
-                          <div className="text-xs text-muted">${Number(q.one_off_total || 0).toLocaleString('en-US')} one-off{q.recurring_arr > 0 ? ` · $${Number(q.recurring_arr).toLocaleString('en-US')} ARR` : ''}</div>
+                          <div className="text-xs text-muted">${Number(q.one_off_total || 0).toLocaleString('en-US')}</div>
                         </div>
                         <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-slate-100 text-slate-600 border border-slate-200">{q.status}</span>
                       </div>

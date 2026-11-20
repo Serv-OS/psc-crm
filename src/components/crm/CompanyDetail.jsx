@@ -6,8 +6,7 @@ import ActivityTimeline from './ActivityTimeline.jsx';
 import CallButton from '../CallButton.jsx';
 import LeadBadge from './LeadBadge.jsx';
 import LeadsCard from './LeadsCard.jsx';
-import ProcessingRatesCard from './ProcessingRatesCard.jsx';
-import HardwareCard from './HardwareCard.jsx';
+import { propertyTypeLabel } from '../../lib/propertyTypes';
 import InvoicesCard from './InvoicesCard.jsx';
 import { primaryLead } from '../../lib/leadStages';
 
@@ -195,7 +194,7 @@ export default function CompanyDetail({ companyId, profile, onClose, onNavigate,
                         className="flex items-center gap-3 p-3 glass-inner rounded-xl cursor-pointer">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-paper">{l.name}</div>
-                          <div className="text-xs text-muted">{[l.venue_type, l.city].filter(Boolean).join(' / ')}</div>
+                          <div className="text-xs text-muted">{[propertyTypeLabel(l.venue_type), l.city].filter(Boolean).join(' / ')}</div>
                         </div>
                         <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${STATUS_COLORS[l.status] || 'bg-card text-dim'}`}>{l.status}</span>
                         {canWrite && (
@@ -225,10 +224,6 @@ export default function CompanyDetail({ companyId, profile, onClose, onNavigate,
             <div className="col-span-4 space-y-4">
 
               <LeadsCard leads={leads} />
-
-              <ProcessingRatesCard companyId={companyId} onNavigate={onNavigate} />
-
-              <HardwareCard companyId={companyId} profile={profile} />
 
               <InvoicesCard companyId={companyId} profile={profile} onNavigate={onNavigate} />
 

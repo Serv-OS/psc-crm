@@ -21,11 +21,9 @@ const MAPS_COMMON = [
   { v: 'location_postcode', l: 'Location · Postcode' },
   { v: 'message', l: 'Message / notes' },
 ];
-const MAPS_LEAD = [
-  { v: 'venue_type', l: 'Lead · Venue type' },
-  { v: 'covers', l: 'Lead · Covers' },
-  { v: 'current_pos', l: 'Lead · Current POS' },
-];
+// Lead extras. The restaurant fields (venue type, covers, current POS) are
+// gone: PSC sells siding.
+const MAPS_LEAD = [];
 const MAPS_SUPPORT = [{ v: 'subject', l: 'Ticket · Subject' }];
 
 function fieldKey(label, existing) {

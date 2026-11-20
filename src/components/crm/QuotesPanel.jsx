@@ -153,8 +153,7 @@ export default function QuotesPanel({ profile, onNavigate }) {
                   <th className="text-left px-4 py-2.5">Customer</th>
                   <th className="text-left px-4 py-2.5 hidden md:table-cell">Created</th>
                   <th className="text-left px-4 py-2.5 hidden md:table-cell">Valid until</th>
-                  <th className="text-right px-4 py-2.5">One-off total</th>
-                  <th className="text-right px-4 py-2.5 hidden lg:table-cell">ARR</th>
+                  <th className="text-right px-4 py-2.5">Total</th>
                   <th className="text-left px-4 py-2.5">Status</th>
                 </tr>
               </thead>
@@ -172,7 +171,6 @@ export default function QuotesPanel({ profile, onNavigate }) {
                       <td className="px-4 py-3 text-muted hidden md:table-cell">{fmtD(q.created_at)}</td>
                       <td className="px-4 py-3 text-muted hidden md:table-cell">{fmtD(q.valid_until)}</td>
                       <td className="px-4 py-3 text-right tabular-nums text-paper">{money(q.one_off_total)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-muted hidden lg:table-cell">{Number(q.recurring_arr) ? money(q.recurring_arr) : '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${QUOTE_BADGE[st] || 'bg-slate-100 text-slate-500'}`}>{st}</span>

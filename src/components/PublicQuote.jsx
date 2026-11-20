@@ -144,7 +144,7 @@ export default function PublicQuote({ token }) {
           <Row k={isStaged ? 'Contract total' : 'Due on acceptance'} v={money(q.one_off_total)} bold accent={accent} />
           {q.recurring_arr > 0 && <Row k="Ongoing (per year)" v={money(q.recurring_arr)} sub />}
         </div>
-        {q.go_live_date && <div className="text-xs text-slate-500 mt-3">Planned go-live: <strong>{fmtDate(q.go_live_date)}</strong></div>}
+        {q.go_live_date && <div className="text-xs text-slate-500 mt-3">Planned start: <strong>{fmtDate(q.go_live_date)}</strong></div>}
       </div>
 
       {/* Payment schedule (staged billing) */}

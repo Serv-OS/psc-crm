@@ -10,8 +10,6 @@ import ActivityTimeline from './ActivityTimeline.jsx';
 import CallButton from '../CallButton.jsx';
 import LeadBadge from './LeadBadge.jsx';
 import LeadsCard from './LeadsCard.jsx';
-import ProcessingRatesCard from './ProcessingRatesCard.jsx';
-import HardwareCard from './HardwareCard.jsx';
 import InvoicesCard from './InvoicesCard.jsx';
 import { primaryLead } from '../../lib/leadStages';
 
@@ -152,7 +150,6 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
               </select>
             ) : null}
             {location.venue_type && <span className="text-xs text-muted">{propertyTypeLabel(location.venue_type)}</span>}
-            {location.covers && <span className="text-xs text-muted">{location.covers} covers</span>}
           </div>
         </div>
         {!editing && <TimerButton subjectType="location" subjectId={locationId} label={location.name} profile={profile} />}
@@ -184,7 +181,6 @@ export default function LocationDetail({ locationId, profile, onClose, onNavigat
                     <option value="">Select…</option>
                     {PROPERTY_TYPES.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
                   </select></div>
-                <div><label className={label}>Covers</label><input className={input} type="number" value={draft.covers || ''} onChange={e => set('covers', e.target.value ? parseInt(e.target.value) : null)} /></div>
                 <div><label className={label}>Address</label><input className={input} value={draft.address || ''} onChange={e => set('address', e.target.value)} /></div>
                 <div><label className={label}>City</label><input className={input} value={draft.city || ''} onChange={e => set('city', e.target.value)} /></div>
                 <div><label className={label}>Postcode</label><input className={input} value={draft.postcode || ''} onChange={e => set('postcode', e.target.value)} /></div>
