@@ -152,6 +152,7 @@ serve(async (req) => {
       await supabase.from("associations").insert({ from_type: "contact", from_id: contactId, to_type: "location", to_id: locationId, label: "primary_contact" });
     }
 
+    const financing = ["yes", "no", "maybe"].includes(String(body?.financing)) ? String(body.financing) : null;
     const profileLabel = sel.profile || profileKey;
     const finishLabel = finishKey === "primed" ? "Primed for paint" : `ColorPlus ${sel.color || ""}`.trim();
     const notes = [
@@ -161,12 +162,20 @@ serve(async (req) => {
       proj.perimeterFt ? `Footprint perimeter ${Math.round(num(proj.perimeterFt)).toLocaleString("en-US")} ft` : "",
       body?.estimate ? `Customer saw estimate ${body.estimate.low ? "$" + Math.round(body.estimate.low).toLocaleString("en-US") : ""}–${body.estimate.high ? "$" + Math.round(body.estimate.high).toLocaleString("en-US") : ""}` : "",
       c.notes || "",
+      financing === "yes" ? "Financing: interested (asked on the website)" : financing === "no" ? "Financing: not needed" : "",
     ].filter(Boolean).join("\n");
 
     // ── lead ──
-    const { data: lead } = await supabase.from("leads").insert({
-      name, stage: "new_lead", source: "instant-quote", priority: "warm", location_id: locationId, contact_id: contactId, notes, owner_id: ownerId,
-    }).select("id, stage").single();
+    // financing is the website's "Interested in financing?" answer (087). If
+    // that column is not there yet, the lead is still made; the notes say it.
+    const leadRow: Record<string, unknown> = {
+      name, stage: "new_lead", source: "instant-quote", priority: financing === "yes" ? "hot" : "warm",
+      location_id: locationId, contact_id: contactId, notes, owner_id: ownerId,
+    };
+    let { data: lead, error: leadErr } = await supabase.from("leads").insert({ ...leadRow, financing }).select("id, stage").single();
+    if (leadErr && /financing/.test(leadErr.message)) {
+      ({ data: lead, error: leadErr } = await supabase.from("leads").insert(leadRow).select("id, stage").single());
+    }
     if (lead) await supabase.from("stage_history").insert({ object_type: "lead", object_id: lead.id, from_stage: null, to_stage: "new_lead", changed_by: ownerId });
 
     // ── deal (stage 'estimate' — first pipeline column; a draft quote is ready) ──

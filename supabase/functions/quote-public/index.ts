@@ -48,6 +48,8 @@ serve(async (req) => {
           one_off_subtotal: quote.one_off_subtotal, tax_amount: quote.tax_amount, one_off_total: quote.one_off_total,
           recurring_arr: quote.recurring_arr, terms: quote.terms || s.quote_terms || "",
           signed: !!quote.signed_at, signed_by_name: quote.signed_by_name, created_at: quote.created_at, expired,
+          // Financing button (087). Missing column = on, like the default.
+          offer_financing: quote.offer_financing !== false,
         },
         seller: {
           name: s.business_name || "ServOS", address: s.business_address || "",

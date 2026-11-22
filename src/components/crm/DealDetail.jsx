@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { handleClosedWon } from '../../lib/dealHelpers';
 import TimerButton from './TimerButton.jsx';
 import AssociationManager from './AssociationManager.jsx';
+import { DEAL_FINANCING } from '../../lib/financing';
 import ActivityTimeline from './ActivityTimeline.jsx';
 
 const STAGES = [
@@ -209,6 +210,20 @@ export default function DealDetail({ dealId, profile, onClose, onNavigate }) {
                 <div className="space-y-3">
                   <Field label="Stage" value={STAGE_LABELS[deal.stage]} />
                   <Field label="Source" value={deal.source} />
+                  <div>
+                    <div className="text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-dim mb-0.5">Financing</div>
+                    <select value={deal.financing_status || ''} disabled={!canWrite}
+                      onChange={async e => {
+                        const v = e.target.value || null;
+                        const { error } = await supabase.from('deals').update({ financing_status: v }).eq('id', dealId);
+                        if (error) { alert('Could not save financing: ' + error.message); return; }
+                        setDeal(d => ({ ...d, financing_status: v }));
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-card border border-bdr rounded-xl text-sm text-paper">
+                      <option value="">Not discussed</option>
+                      {DEAL_FINANCING.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                    </select>
+                  </div>
                   <Field label="Install date" value={deal.expected_close_date ? new Date(deal.expected_close_date).toLocaleDateString('en-US') : null} />
                   <Field label="Owner" value={ownerName(deal.owner_id)} />
                   <Field label="Created" value={new Date(deal.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' })} />

@@ -259,6 +259,8 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
       status: quote.status, location_id: quote.location_id || null,
       one_off_subtotal: salePrice, tax_amount: taxAmount, one_off_total: customerTotal,
       recurring_arr: 0, updated_at: now,
+      // Only once the 087 column exists (the quote row then carries it).
+      ...('offer_financing' in quote ? { offer_financing: quote.offer_financing !== false } : {}),
     }).eq('id', quoteId);
 
     // Keep the linked deal's contract value in lock-step with the quote total
@@ -678,6 +680,12 @@ export default function QuoteBuilder({ quoteId, profile, onClose, onNavigate }) 
                   {quote.payment_terms === 'staged' && <div className="text-[10px] text-dim mt-1">Set up the deposit + milestones in the <span className="text-ember font-semibold">Payment schedule</span> panel at the top of the quote.</div>}
                   {quote.payment_terms === 'pay_now' && <div className="text-[10px] text-amber-600 font-medium mt-1">Signing charges the customer the FULL {money(customerTotal)} in one payment. For the usual 40/30/30 split, choose Staged.</div>}
                   {quote.payment_terms === 'staged' && stages.length === 0 && <div className="text-[10px] text-amber-600 font-medium mt-1">No stages configured yet — the quote can't be saved until the schedule totals {money(customerTotal)}.</div>}</div>
+                {'offer_financing' in quote && (
+                  <label className="col-span-2 flex items-start gap-2 text-sm text-paper cursor-pointer">
+                    <input type="checkbox" className="mt-0.5" checked={quote.offer_financing !== false} onChange={e => setQ('offer_financing', e.target.checked)} disabled={!canWrite} />
+                    <span>Offer financing on this quote<span className="block text-[10px] text-dim">The customer sees an estimated monthly payment and an Apply for financing button (Enhancify).</span></span>
+                  </label>
+                )}
                 {quote.payment_terms === 'deposit' && <div className="col-span-2"><label className={label}>Deposit %</label><input type="number" className={input} value={quote.deposit_percent || 0} onChange={e => setQ('deposit_percent', e.target.value)} disabled={!canWrite} /></div>}
               </div>
             </div>

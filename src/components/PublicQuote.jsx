@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { applyUrl, monthlyPayment, EXAMPLE_APR, EXAMPLE_YEARS, LOWEST_APR } from '../lib/financing';
 import { LogoLockup } from './ServOSLogo.jsx';
 
 const FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
@@ -146,6 +147,32 @@ export default function PublicQuote({ token }) {
         </div>
         {q.go_live_date && <div className="text-xs text-slate-500 mt-3">Planned start: <strong>{fmtDate(q.go_live_date)}</strong></div>}
       </div>
+
+      {/* Financing through Enhancify (087). A monthly figure always shows the
+          APR and term that made it, and that the rate depends on credit. */}
+      {q.offer_financing && Number(q.one_off_total) >= 500 && !q.signed && (
+        <div className="px-6 sm:px-8 py-5 border-b border-slate-200" style={{ background: '#f3f8f4' }}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Prefer to pay monthly?</div>
+              <div className="text-lg font-bold text-slate-800 mt-0.5">
+                About {money(monthlyPayment(Number(q.one_off_total)))} a month*
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                Financing available through Enhancify. Rates from {LOWEST_APR}% APR. Checking your rate won&apos;t affect your credit score.
+              </div>
+            </div>
+            <a href={applyUrl('quote-' + (q.number || ''))} target="_blank" rel="noopener"
+              className="shrink-0 px-5 py-3 rounded-xl text-white text-sm font-bold text-center"
+              style={{ backgroundColor: accent }}>
+              Apply for financing
+            </a>
+          </div>
+          <div className="text-[10px] text-slate-400 mt-3 leading-relaxed">
+            *Example for the full {money(q.one_off_total)} at {EXAMPLE_APR}% APR over {EXAMPLE_YEARS} years ({EXAMPLE_YEARS * 12} monthly payments), total repaid {money(monthlyPayment(Number(q.one_off_total)) * EXAMPLE_YEARS * 12)}. Not an offer. Your rate and term depend on your credit and the lender. Financing is provided by Enhancify&apos;s lending partners, subject to approval; {seller.name || 'we'} is not a lender.
+          </div>
+        </div>
+      )}
 
       {/* Payment schedule (staged billing) */}
       {isStaged && (

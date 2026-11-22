@@ -15,6 +15,7 @@ import { LEAD_STAGES, LEAD_STAGE_MAP } from '../../lib/leadStages';
 
 const STAGE_FLOW = ['new_lead', 'attempting', 'contacted', 'qualified'];
 import { sourceOptions, sourceLabel } from '../../lib/leadSources';
+import { LEAD_FINANCING, leadFinancingLabel } from '../../lib/financing';
 
 export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
   const [lead, setLead] = useState(null);
@@ -82,6 +83,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
     const patch = {
       name: draft.name, source: draft.source || null, priority: draft.priority,
       next_action: draft.next_action || null,
+      ...(draft.financing !== lead.financing ? { financing: draft.financing || null } : {}),
       next_action_date: draft.next_action_date || null, notes: draft.notes || null,
       owner_id: draft.owner_id || null,
     };
@@ -144,6 +146,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
           <div className="flex items-center gap-2">
             <div className="text-xl font-bold text-paper truncate">{lead.name}</div>
             <LeadBadge stage={lead.stage} full />
+            {lead.financing === 'yes' && <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-100 text-emerald-700 border border-emerald-200">$ Wants financing</span>}
           </div>
           <div className="text-xs text-muted mt-0.5">
             {lead.source && <span>{lead.source.replace(/_/g, ' ')} / </span>}
@@ -198,6 +201,8 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                     <option value="hot">Hot</option><option value="warm">Warm</option><option value="medium">Medium</option><option value="cold">Cold</option></select></div>
                   <div><label className={label}>Owner</label><select className={input} value={draft.owner_id || ''} onChange={e => set('owner_id', e.target.value || null)}>
                     <option value="">Unassigned</option>{members.map(m => <option key={m.id} value={m.id}>{m.display_name || m.email}</option>)}</select></div>
+                  <div><label className={label}>Financing</label><select className={input} value={draft.financing || ''} onChange={e => set('financing', e.target.value)}>
+                    <option value="">Not asked</option>{LEAD_FINANCING.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</select></div>
                   <div><label className={label}>Next action</label><input className={input} value={draft.next_action || ''} onChange={e => set('next_action', e.target.value)} placeholder="e.g. Site visit to measure" /></div>
                   <div><label className={label}>Next action date</label><input type="date" className={input} value={draft.next_action_date || ''} onChange={e => set('next_action_date', e.target.value)} /></div>
                 </div>
@@ -215,6 +220,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                   <Field label="Source" value={sourceLabel(lead.source)} />
                   <Field label="Priority" value={lead.priority} />
                   <Field label="Next action" value={[lead.next_action, lead.next_action_date].filter(Boolean).join(' / ')} />
+                  <Field label="Financing" value={leadFinancingLabel(lead.financing)} />
                   <Field label="Owner" value={ownerName(lead.owner_id)} />
                   <Field label="Created" value={new Date(lead.created_at).toLocaleDateString('en-US', { day:'numeric', month:'short', year:'2-digit' })} />
                   {lead.disqualified_reason && <Field label="Disqualified" value={lead.disqualified_reason} />}

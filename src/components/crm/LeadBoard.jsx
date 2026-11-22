@@ -383,6 +383,7 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
                         <div className="text-sm font-semibold text-paper leading-snug">{lead.name}</div>
                         <span className={`px-1 py-0.5 text-[8px] font-bold uppercase rounded shrink-0 ${PRIORITY_STYLES[lead.priority]}`}>{lead.priority}</span>
                       </div>
+                      {lead.financing === 'yes' && <div className="mb-1"><span className="px-1 py-0.5 text-[8px] font-bold uppercase rounded bg-emerald-100 text-emerald-700 border border-emerald-200">$ Wants financing</span></div>}
 
                       {lead.company_id && <div className="text-[10px] text-muted mb-0.5">{'\u{1F3E2}'} {companyName(lead.company_id)}</div>}
                       {lead.location_id && <div className="text-[10px] text-muted mb-0.5">{'\u{1F4CD}'} {locationName(lead.location_id)}</div>}
@@ -431,7 +432,7 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
             <tbody>
               {filtered.map(lead => (
                 <tr key={lead.id} onClick={() => onNavigate?.('lead', lead.id)} className="border-b border-bdr hover:bg-card/50 cursor-pointer transition">
-                  <td className="px-6 py-3 text-sm text-paper font-medium">{lead.name}</td>
+                  <td className="px-6 py-3 text-sm text-paper font-medium">{lead.name}{lead.financing === 'yes' && <span className="ml-2 px-1 py-0.5 text-[8px] font-bold uppercase rounded bg-emerald-100 text-emerald-700 border border-emerald-200">$ Financing</span>}</td>
                   <td className="px-3 py-3 text-xs text-muted">{companyName(lead.company_id)}</td>
                   <td className="px-3 py-3 text-xs text-muted">{contactFullName(lead.contact_id)}</td>
                   <td className="px-3 py-3 text-center"><span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${PRIORITY_STYLES[lead.priority]}`}>{lead.priority}</span></td>

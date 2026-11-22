@@ -89,6 +89,10 @@ serve(async (req) => {
       const sourceTag = (src || form.source_tag || (form.destination === "support" ? "web_form" : "website")) as string;
       const extrasNote = extras.length ? `\n\n--- Form details ---\n${extras.join("\n")}` : "";
       const pageNote = page_url ? `\n(Submitted from: ${page_url})` : "";
+      // The website's "Interested in financing?" answer (087), sent whatever
+      // fields the form has.
+      const financing = ["yes", "no", "maybe"].includes(String(data.financing)) ? String(data.financing) : null;
+      const finNote = financing === "yes" ? "\nFinancing: interested (asked on the website)" : financing === "no" ? "\nFinancing: not needed" : "";
 
       const submission: Record<string, unknown> = {
         form_id: form.id, data, source_tag: sourceTag, page_url, referrer, status: "processed",
@@ -200,7 +204,7 @@ serve(async (req) => {
       } else {
         // Create a lead
         const leadName = mapped.company_name || personName || email || form.name;
-        const { data: lead, error: lErr } = await supabase.from("leads").insert({
+        const leadRow: Record<string, unknown> = {
           name: leadName,
           stage: "new_lead",
           source: sourceTag,
@@ -210,9 +214,13 @@ serve(async (req) => {
           venue_type: mapped.venue_type || null,
           covers: mapped.covers ? parseInt(mapped.covers) : null,
           current_pos: mapped.current_pos || null,
-          priority: form.settings?.default_priority || "warm",
-          notes: (mapped.message || "") + extrasNote + pageNote,
-        }).select("id").single();
+          priority: financing === "yes" ? "hot" : (form.settings?.default_priority || "warm"),
+          notes: (mapped.message || "") + finNote + extrasNote + pageNote,
+        };
+        let { data: lead, error: lErr } = await supabase.from("leads").insert(financing ? { ...leadRow, financing } : leadRow).select("id").single();
+        if (lErr && financing && /financing/.test(lErr.message)) {
+          ({ data: lead, error: lErr } = await supabase.from("leads").insert(leadRow).select("id").single());
+        }
         if (lErr) {
           submission.status = "error"; submission.error = lErr.message;
           await supabase.from("form_submissions").insert(submission);

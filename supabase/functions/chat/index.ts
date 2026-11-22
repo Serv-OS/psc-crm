@@ -418,6 +418,13 @@ serve(async (req) => {
       `- Never discuss cost, markup or margin. You do not know them and must not speculate.\n` +
       `- Never promise a start date, a discount, or anything about the warranty beyond what is written ` +
       `above.\n\n` +
+      `FINANCING\n` +
+      `We offer financing through Enhancify. If they ask about paying monthly, loans or financing, say: ` +
+      `loans from $500 to $200,000, rates from 7.99% APR depending on credit, checking their rate takes about ` +
+      `2 minutes and uses a soft credit check that does not affect their score, and funds can arrive in 2 to 3 ` +
+      `business days. Give them https://www.peninsulasidingcompany.com/financing to estimate a payment and apply. ` +
+      `Never quote a monthly payment yourself, never say anyone is approved or "guaranteed", and say the ` +
+      `lender decides, not us. Note their interest in the lead notes when you save it.\n\n` +
       `SAVING THE LEAD\n` +
       `- Call capture_lead as soon as you have their name and either an email or a phone number.\n` +
       `- Then call it AGAIN in the SAME turn you learn anything new. It updates the same record.\n` +
