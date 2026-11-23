@@ -47,6 +47,14 @@ async function google(key: string, address: string) {
     if (geo.status === "REQUEST_DENIED") throw new Error(`Google refused the CRM's key: ${geo.error_message || "no reason given"}`);
     throw new Error(`Google could not find "${address}" (${geo.status}).`);
   }
+  // Only research a HOUSE. If Google could only place the town or the street
+  // (a misspelt street name does this), stop rather than research whatever
+  // building sits in the middle of town (SEA, 23 Nov 2026: a typo'd street
+  // returned "Redwood City" and the library got researched).
+  const types: string[] = hit.types || [];
+  if (!types.some((t) => ["street_address", "premise", "subpremise"].includes(t))) {
+    throw new Error(`Google could only find "${hit.formatted_address}" for "${address}", not the house itself. Check the house number and the spelling of the street on the property, then research again.`);
+  }
   const pos = hit.geometry.location as { lat: number; lng: number };
   facts.position = pos;
   facts.formatted_address = hit.formatted_address;
