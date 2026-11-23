@@ -235,7 +235,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
                 </div>
               </Card>
 
-              {location && <HouseResearchCard locationId={location.id} address={location.address} profile={profile} />}
+              {location && <HouseResearchCard locationId={location.id} address={location.address} profile={profile} readOnly onOpenProperty={() => onNavigate?.('location', location.id)} />}
               <AttachmentsCard subjectType="lead" subjectId={leadId} profile={profile} />
             </div>
 

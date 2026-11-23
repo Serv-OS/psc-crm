@@ -16,14 +16,16 @@ const num = (v, unit = '') => (v == null || v === '' ? null : `${Number(v).toLoc
 const yesNo = (v) => (v === true ? 'Yes' : v === false ? 'No' : null);
 const fmtDate = (d) => (d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 
-export default function HouseResearchCard({ locationId, address, profile }) {
+// readOnly (on a lead): shows the property's research, never starts one; the
+// address lives on the property, so research is run from there (Peter, 23 Nov).
+export default function HouseResearchCard({ locationId, address, profile, readOnly = false, onOpenProperty }) {
   const [row, setRow] = useState(null);
   const [urls, setUrls] = useState({});
   const [starting, setStarting] = useState(false);
   const [err, setErr] = useState('');
   const [open, setOpen] = useState(true);
   const chan = useRef(null);
-  const canRun = profile?.role === 'owner' || profile?.role === 'editor';
+  const canRun = !readOnly && (profile?.role === 'owner' || profile?.role === 'editor');
 
   const load = async () => {
     if (!locationId) return;
@@ -84,8 +86,11 @@ export default function HouseResearchCard({ locationId, address, profile }) {
 
       <div className="p-4 space-y-4 text-sm">
         {err && <div className="text-xs text-red-600">{err}</div>}
-        {!String(address || '').trim() && <div className="text-xs text-dim">Add the property address to research it.</div>}
-        {!row && String(address || '').trim() && !err && (
+        {!readOnly && !String(address || '').trim() && <div className="text-xs text-dim">Add the property address to research it.</div>}
+        {readOnly && !row && (
+          <div className="text-xs text-dim">Not researched yet. Run it from the property{onOpenProperty ? <> (<button onClick={onOpenProperty} className="text-ember hover:underline">open the property</button>)</> : ''}.</div>
+        )}
+        {!readOnly && !row && String(address || '').trim() && !err && (
           <div className="text-xs text-dim">Looks up the house's age, sales and owner, permits, the siding on it now, access, lead and fire zone rules, and answers our pre-qualification and scope questions. Takes about 2 minutes.</div>
         )}
         {running && (
