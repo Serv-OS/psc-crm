@@ -78,7 +78,7 @@ export default function CompanyDetail({ companyId, profile, onClose, onNavigate,
   const addLocation = async () => {
     const name = prompt('Location name:');
     if (!name?.trim()) return;
-    await supabase.from('locations').insert({ company_id: companyId, name: name.trim(), owner_id: profile.id });
+    await supabase.from('locations').insert({ company_id: companyId, name: name.trim(), ...(/^\d+\s/.test(name.trim()) ? { address: name.trim() } : {}), owner_id: profile.id });
     load();
   };
 

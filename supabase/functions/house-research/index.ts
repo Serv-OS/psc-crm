@@ -231,7 +231,8 @@ async function claude(apiKey: string, model: string, address: string, enquirer: 
 
 async function run(supabase: any, id: string, loc: any, apiKey: string, model: string, gkey: string) {
   try {
-    const address = [loc.address, loc.city, loc.postcode].filter(Boolean).join(", ");
+    const street = String(loc.address || "").trim() || (/^\d+\s/.test(String(loc.name || "")) ? String(loc.name).trim() : "");
+    const address = [street, loc.city, loc.postcode].filter(Boolean).join(", ");
     const { facts, shots } = await google(gkey, address);
 
     // Keep the photos (private bucket) and hand them to Claude.
@@ -278,9 +279,11 @@ serve(async (req) => {
   try {
     const { location_id } = await req.json().catch(() => ({}));
     if (!location_id) return json({ error: "Missing location_id" }, 422);
-    const { data: loc } = await supabase.from("locations").select("id, address, city, postcode").eq("id", location_id).maybeSingle();
+    const { data: loc } = await supabase.from("locations").select("id, name, address, city, postcode").eq("id", location_id).maybeSingle();
     if (!loc) return json({ error: "Property not found" }, 404);
-    if (!String(loc.address || "").trim()) return json({ error: "Add the property's address first." }, 422);
+    const street = String(loc.address || "").trim() || (/^\d+\s/.test(String(loc.name || "")) ? String(loc.name).trim() : "");
+    const address = [street, loc.city, loc.postcode].filter(Boolean).join(", ");
+    if (!address.trim()) return json({ error: "Add the property's address first." }, 422);
 
     // Pasted keys can carry spaces or quote marks.
     const gkey = (Deno.env.get("GOOGLE_MAPS_API_KEY") || "").trim().replace(/^["']+|["']+$/g, "");
@@ -293,7 +296,6 @@ serve(async (req) => {
       .gte("created_at", new Date(Date.now() - 10 * 60000).toISOString()).limit(1);
     if (busy?.length) return json({ id: busy[0].id, already: true });
 
-    const address = [loc.address, loc.city, loc.postcode].filter(Boolean).join(", ");
     const { data: row, error } = await supabase.from("house_research").insert({ location_id: loc.id, address, created_by: prof.id }).select("id").single();
     if (error) return json({ error: error.message }, 500);
 

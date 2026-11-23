@@ -191,7 +191,11 @@ export default function LeadBoard({ profile, onNavigate, prefill, onPrefillConsu
 
     // Create new location (property/site) if typed but not selected
     if (!locationId && locationSearch.trim()) {
-      const { data } = await supabase.from('locations').insert({ name: locationSearch.trim(), owner_id: profile.id }).select().single();
+      // What is typed here is the property's address (23 Nov 2026: 32 PSC
+      // properties had it only as the name, so the address box was empty and
+      // house research could not run). Save it as both.
+      const typed = locationSearch.trim();
+      const { data } = await supabase.from('locations').insert({ name: typed, address: typed, owner_id: profile.id }).select().single();
       if (data) locationId = data.id;
     }
 
