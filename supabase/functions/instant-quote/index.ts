@@ -80,12 +80,145 @@ async function notifyOwner(supabase: any, info: { name: string; line: string; ad
   } catch (e) { console.error("alert SMS failed", e); }
 }
 
+// The DRAFT quote, built with the same engine and catalogue a salesperson uses.
+// Shared by the website path and the CRM path (attach to an existing lead).
+async function buildDraftQuote(supabase: any, a: {
+  dealId: string | null; contactId: string | null; locationId: string | null; ownerId: string | null;
+  sqft: number; stories: number; demoKey: string; profileKey: string; finishKey: string; note: string;
+}): Promise<{ quoteId: string | null; quoteNumber: number | null; customerTotal: number }> {
+  const { dealId, contactId, locationId, ownerId, sqft, stories, demoKey, profileKey, finishKey } = a;
+  let quoteId: string | null = null;
+  let quoteNumber: number | null = null;
+  let customerTotal = 0;
+  try {
+    if (dealId && sqft > 0) {
+      const [{ data: cfgRow }, { data: prods }, { data: instMats }, { data: demoRates }] = await Promise.all([
+        supabase.from("quote_config").select("*").eq("id", 1).maybeSingle(),
+        supabase.from("quote_config_products").select("*").eq("active", true).order("sort"),
+        supabase.from("quote_config_install_materials").select("*").eq("active", true).order("sort"),
+        supabase.from("quote_config_demo_rates").select("*").eq("active", true).order("sort"),
+      ]);
+      const cfg = buildEngineConfig({ config: cfgRow || {}, products: prods || [], installMaterials: instMats || [], demoRates: demoRates || [] });
+
+      const findProduct = (target: string) => cfg.products.find((p: any) => p.name === target)
+        || cfg.products.find((p: any) => p.name.toLowerCase().includes(profileKey) && p.name.toLowerCase().includes(finishKey === "primed" ? "primed" : "colorplus"));
+      const mainName = (PRODUCT_NAMES[profileKey] || PRODUCT_NAMES.lap)[finishKey];
+      const mainProd = findProduct(mainName);
+      const qty: Record<string, number> = {};
+      if (mainProd) qty[mainProd.id] = sqft;
+      const result = computeQuote(cfg, { totalSqft: sqft, numStories: stories, demoType: DEMO_LABELS[demoKey] || "", markup: cfg.markupDefault, qty });
+
+      const taxRate = 0; // US — no tax on the auto-draft; sales can adjust
+      const salePrice = result.salePrice;
+      const taxAmount = salePrice * taxRate / 100;
+      customerTotal = salePrice + taxAmount;
+      const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+
+      const { data: q } = await supabase.from("quotes").insert({
+        deal_id: dealId, contact_id: contactId, location_id: locationId, status: "draft",
+        valid_until: validUntil, payment_terms: "pay_now", tax_rate: taxRate,
+        one_off_subtotal: salePrice, tax_amount: taxAmount, one_off_total: customerTotal, recurring_arr: 0,
+        notes: a.note, created_by: ownerId,
+      }).select("id, quote_number").single();
+      quoteId = q?.id ?? null;
+      quoteNumber = q?.quote_number ?? null;
+
+      if (quoteId) {
+        const lines = buildCustomerLines(result, taxRate).map((l) => ({ ...l, quote_id: quoteId }));
+        if (lines.length) await supabase.from("quote_line_items").insert(lines);
+        await supabase.from("quote_estimates").insert({
+          quote_id: quoteId, total_sqft: result.totalSqft, num_stories: result.numStories,
+          demo_type: result.demoType || null, markup: result.markup,
+          inputs: { totalSqft: result.totalSqft, numStories: result.numStories, demoType: result.demoType, markup: result.markup, qty, customItems: [] },
+          siding_material: result.sidingMaterialSum, siding_install: result.sidingInstallSum, install_mat_sum: result.installSum,
+          demo_cost: result.demoCost, permits_cost: result.permitsCost, debris_cost: result.debrisCost,
+          total_cost: result.totalCost, sale_price: result.salePrice, profit: result.profit, margin: result.margin,
+          breakdown: buildEstimateRecord(result, cfg),
+        });
+        await supabase.from("deals").update({ value: customerTotal, currency: "USD" }).eq("id", dealId);
+      }
+    }
+  } catch (e) {
+    console.error("quote build failed (lead/deal kept)", e);
+  }
+  return { quoteId, quoteNumber, customerTotal };
+}
+
+// CRM path (Peter, 23 Nov 2026): a rep measures an EXISTING lead's house in the
+// CRM. The quote attaches to that lead: its contact, its property, its deal
+// (made if it has none). Nothing new is created for the customer and no
+// new-lead alert goes out. Only a signed in owner or editor may do this.
+async function attachToLead(req: Request, body: any) {
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  const { data: u } = await supabase.auth.getUser(jwt);
+  if (!u?.user) return json({ error: "Sign in again." }, 401);
+  const { data: prof } = await supabase.from("profiles").select("id, role, display_name").eq("id", u.user.id).maybeSingle();
+  if (!prof || !["owner", "editor"].includes(prof.role)) return json({ error: "Only owners and editors can make quotes." }, 403);
+
+  const { data: lead } = await supabase.from("leads")
+    .select("id, name, stage, contact_id, location_id, deal_id, owner_id").eq("id", String(body.lead_id)).maybeSingle();
+  if (!lead) return json({ error: "Lead not found" }, 404);
+
+  const sel = body?.selection || {};
+  const proj = body?.project || {};
+  const profileKey = String(sel.profileKey || "lap");
+  const finishKey = String(sel.finishKey || "colorplus") === "primed" ? "primed" : "colorplus";
+  const demoKey = String(proj.demoKey || "siding");
+  const sqft = num(proj.sqft);
+  const stories = num(proj.stories, 1);
+  if (!(sqft > 0)) return json({ error: "Measure the house first (no sq ft)." }, 422);
+  const address = String(proj.address || "").trim() || null;
+  const ownerId = lead.owner_id || prof.id;
+  const profileLabel = sel.profile || profileKey;
+  const finishLabel = finishKey === "primed" ? "Primed for paint" : `ColorPlus ${sel.color || ""}`.trim();
+
+  // Property: keep the lead's; if it has none, make one from the measured address.
+  let locationId: string | null = lead.location_id;
+  if (!locationId && address) {
+    const { data: loc } = await supabase.from("locations").insert({
+      name: address, address, country: "US", status: "prospect", owner_id: ownerId,
+    }).select("id").single();
+    locationId = loc?.id ?? null;
+    if (locationId) {
+      await supabase.from("leads").update({ location_id: locationId }).eq("id", lead.id);
+      if (lead.contact_id) await supabase.from("associations").insert({ from_type: "contact", from_id: lead.contact_id, to_type: "location", to_id: locationId, label: "primary_contact" });
+    }
+  }
+
+  // Deal: the lead's own, or a new one linked to it.
+  let dealId: string | null = lead.deal_id;
+  if (!dealId) {
+    const { data: deal, error: dealErr } = await supabase.from("deals").insert({
+      name: `${lead.name} — ${profileLabel} siding`, stage: "estimate", source: "instant-quote", currency: "USD", owner_id: ownerId,
+    }).select("id").single();
+    if (dealErr || !deal) return json({ error: "Could not make the deal: " + (dealErr?.message || "unknown") }, 500);
+    dealId = deal.id;
+    await supabase.from("stage_history").insert({ object_type: "deal", object_id: dealId, from_stage: null, to_stage: "estimate", changed_by: prof.id });
+    if (lead.contact_id) await supabase.from("associations").insert({ from_type: "deal", from_id: dealId, to_type: "contact", to_id: lead.contact_id, label: "primary_contact" });
+    if (locationId) await supabase.from("associations").insert({ from_type: "deal", from_id: dealId, to_type: "location", to_id: locationId, label: "affected_location" });
+    await supabase.from("leads").update({ stage: "qualified", deal_id: dealId }).eq("id", lead.id);
+    if (lead.stage !== "qualified") await supabase.from("stage_history").insert({ object_type: "lead", object_id: lead.id, from_stage: lead.stage, to_stage: "qualified", changed_by: prof.id });
+  }
+
+  const measured = proj.perimeterFt ? ` Perimeter ${Math.round(num(proj.perimeterFt))} ft, ${stories} storey, ${proj.coverage || "whole house"}.` : "";
+  const built = await buildDraftQuote(supabase, {
+    dealId, contactId: lead.contact_id, locationId, ownerId, sqft, stories, demoKey, profileKey, finishKey,
+    note: `Instant quote from the CRM map tool by ${prof.display_name || "staff"} (${profileLabel} · ${finishLabel}, ~${Math.round(sqft).toLocaleString("en-US")} sq ft).${measured} Review and send.`,
+  });
+  if (!built.quoteId) return json({ error: "The quote could not be built. Check the price list has this product." }, 500);
+  return json({ ok: true, lead_id: lead.id, deal_id: dealId, quote_id: built.quoteId, quote_number: built.quoteNumber, value: built.customerTotal });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+
+  // From the CRM, for a lead already in the system.
+  if (body?.lead_id) return attachToLead(req, body);
 
   // Honeypot + optional shared secret
   if (body?.company) return json({ ok: true });
@@ -192,61 +325,11 @@ serve(async (req) => {
     }
 
     // ── build + attach the DRAFT quote (best-effort; never lose the lead/deal) ──
-    let quoteId: string | null = null;
-    let quoteNumber: number | null = null;
-    let customerTotal = 0;
-    try {
-      if (dealId && sqft > 0) {
-        const [{ data: cfgRow }, { data: prods }, { data: instMats }, { data: demoRates }] = await Promise.all([
-          supabase.from("quote_config").select("*").eq("id", 1).maybeSingle(),
-          supabase.from("quote_config_products").select("*").eq("active", true).order("sort"),
-          supabase.from("quote_config_install_materials").select("*").eq("active", true).order("sort"),
-          supabase.from("quote_config_demo_rates").select("*").eq("active", true).order("sort"),
-        ]);
-        const cfg = buildEngineConfig({ config: cfgRow || {}, products: prods || [], installMaterials: instMats || [], demoRates: demoRates || [] });
-
-        const findProduct = (target: string) => cfg.products.find((p: any) => p.name === target)
-          || cfg.products.find((p: any) => p.name.toLowerCase().includes(profileKey) && p.name.toLowerCase().includes(finishKey === "primed" ? "primed" : "colorplus"));
-        const mainName = (PRODUCT_NAMES[profileKey] || PRODUCT_NAMES.lap)[finishKey];
-        const mainProd = findProduct(mainName);
-        const qty: Record<string, number> = {};
-        if (mainProd) qty[mainProd.id] = sqft;
-        const result = computeQuote(cfg, { totalSqft: sqft, numStories: stories, demoType: DEMO_LABELS[demoKey] || "", markup: cfg.markupDefault, qty });
-
-        const taxRate = 0; // US — no tax on the auto-draft; sales can adjust
-        const salePrice = result.salePrice;
-        const taxAmount = salePrice * taxRate / 100;
-        customerTotal = salePrice + taxAmount;
-        const validUntil = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-
-        const { data: q } = await supabase.from("quotes").insert({
-          deal_id: dealId, contact_id: contactId, location_id: locationId, status: "draft",
-          valid_until: validUntil, payment_terms: "pay_now", tax_rate: taxRate,
-          one_off_subtotal: salePrice, tax_amount: taxAmount, one_off_total: customerTotal, recurring_arr: 0,
-          notes: `Auto-generated from the website instant quote (${profileLabel} · ${finishLabel}). Review and send.`,
-          created_by: ownerId,
-        }).select("id, quote_number").single();
-        quoteId = q?.id ?? null;
-        quoteNumber = q?.quote_number ?? null;
-
-        if (quoteId) {
-          const lines = buildCustomerLines(result, taxRate).map((l) => ({ ...l, quote_id: quoteId }));
-          if (lines.length) await supabase.from("quote_line_items").insert(lines);
-          await supabase.from("quote_estimates").insert({
-            quote_id: quoteId, total_sqft: result.totalSqft, num_stories: result.numStories,
-            demo_type: result.demoType || null, markup: result.markup,
-            inputs: { totalSqft: result.totalSqft, numStories: result.numStories, demoType: result.demoType, markup: result.markup, qty, customItems: [] },
-            siding_material: result.sidingMaterialSum, siding_install: result.sidingInstallSum, install_mat_sum: result.installSum,
-            demo_cost: result.demoCost, permits_cost: result.permitsCost, debris_cost: result.debrisCost,
-            total_cost: result.totalCost, sale_price: result.salePrice, profit: result.profit, margin: result.margin,
-            breakdown: buildEstimateRecord(result, cfg),
-          });
-          await supabase.from("deals").update({ value: customerTotal, currency: "USD" }).eq("id", dealId);
-        }
-      }
-    } catch (e) {
-      console.error("quote build failed (lead/deal kept)", e);
-    }
+    const built = await buildDraftQuote(supabase, {
+      dealId, contactId, locationId, ownerId, sqft, stories, demoKey, profileKey, finishKey,
+      note: `Auto-generated from the website instant quote (${profileLabel} · ${finishLabel}). Review and send.`,
+    });
+    const quoteId = built.quoteId, quoteNumber = built.quoteNumber, customerTotal = built.customerTotal;
 
     // Best-effort new-lead alert to Peter (email + SMS) — never blocks the response.
     if (lead || dealId) {

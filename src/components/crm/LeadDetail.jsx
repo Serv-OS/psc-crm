@@ -8,6 +8,7 @@ import ScopeCard from './ScopeCard.jsx';
 import PreQualCard from './PreQualCard.jsx';
 import AttachmentsCard from './AttachmentsCard.jsx';
 import HouseResearchCard from './HouseResearchCard.jsx';
+import InstantQuoteModal from './InstantQuoteModal.jsx';
 import CallButton from '../CallButton.jsx';
 import ScheduleMeeting from './ScheduleMeeting.jsx';
 import LeadBadge from './LeadBadge.jsx';
@@ -21,6 +22,7 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
   const [lead, setLead] = useState(null);
   const [company, setCompany] = useState(null);
   const [location, setLocation] = useState(null);
+  const [iqOpen, setIqOpen] = useState(false);
   const [contact, setContact] = useState(null);
   const [deal, setDeal] = useState(null);
   const [members, setMembers] = useState([]);
@@ -161,12 +163,17 @@ export default function LeadDetail({ leadId, profile, onClose, onNavigate }) {
         {!editing && phone && <CallButton number={phone} className="px-3 py-2 text-sm" />}
         {canWrite && !editing && (
           <div className="flex gap-2">
+            <button onClick={() => setIqOpen(true)} className="btn-glass px-4 py-2 rounded-xl text-sm" title="Measure the house on the map and attach a draft quote to this lead">Instant quote</button>
             <button onClick={startEdit} className="btn-ghost px-4 py-2 rounded-xl text-sm">Edit</button>
             {profile.role === 'owner' && <button onClick={deleteRecord} className="px-3 py-2 text-xs text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition">Delete</button>}
           </div>
         )}
       </div>
 
+      {iqOpen && (
+        <InstantQuoteModal lead={lead} address={location?.address || ''} onClose={() => setIqOpen(false)}
+          onDone={(r) => { setIqOpen(false); if (r?.quote_id) onNavigate?.('quote', r.quote_id); }} />
+      )}
       {dqOpen && <DisqualifyDialog leadName={lead.name} onCancel={() => setDqOpen(false)} onConfirm={confirmDisqualify} />}
 
       {/* Stage bar */}
