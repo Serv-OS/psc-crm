@@ -9,6 +9,7 @@ import PaymentsPanel from './crm/PaymentsPanel.jsx';
 import InvoicesPanel from './crm/InvoicesPanel.jsx';
 import ReportsPanel from './crm/ReportsPanel.jsx';
 import QuotesPanel from './crm/QuotesPanel.jsx';
+import ContentPanel from './crm/ContentPanel.jsx';
 import CallLogPanel from './crm/CallLogPanel.jsx';
 import SalesPerformance from './crm/SalesPerformance.jsx';
 import PricingCatalogue from './crm/PricingCatalogue.jsx';
@@ -283,6 +284,8 @@ export default function Shell({ session }) {
         return <PricingCatalogue profile={profile} />;
       case 'website':
         return <WebsitePanel />;
+      case 'content':
+        return <ContentPanel profile={profile} />;
       case 'data':
         return <DataPanel profile={profile} />;
       case 'quote_detail':

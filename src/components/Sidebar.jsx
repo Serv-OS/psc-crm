@@ -7,7 +7,7 @@ import {
   Bug, Star, List, Layout, Layers, Package, ChevronRight, Plus, Mail, Calendar, MessageSquare, Clock, Plane, CreditCard, Receipt, TrendingUp,
   Warehouse, Boxes, PackagePlus, PackageMinus, ShoppingCart, ClipboardCheck, Truck, Factory,
   Settings as SettingsIcon, Users as UsersIcon, FileSignature, PhoneCall, Wallet, Tags, Percent, Landmark,
-  Search, PanelLeftClose, PanelLeftOpen, Pin, History, Globe
+  Search, PanelLeftClose, PanelLeftOpen, Pin, History, Globe, Megaphone
 } from 'lucide-react';
 
 // Core pinned block (un-grouped, top).
@@ -26,7 +26,7 @@ const COLLAPSIBLE = [
     ['pricing', 'Line-item prices', Box],
   ] },
   { id: 'website', label: 'Website', items: [
-    ['website', 'Website', Globe],
+    ['website', 'Website', Globe], ['content', 'Content autopilot', Megaphone],
   ] },
   { id: 'delivery', label: 'Delivery', items: [
     ['onboarding', 'Build Stages', Rocket], ['projects', 'Projects', Folder], ['tasks', 'Tasks', CheckSquare],
