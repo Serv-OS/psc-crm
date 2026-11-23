@@ -8,7 +8,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-website-secret",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
@@ -56,8 +56,24 @@ serve(async (req) => {
       if (!form.enabled) return json({ error: "This form is no longer active." }, 410);
 
       // Spam protection — verify the reCAPTCHA v2 token when a secret is set.
+      //
+      // The website posts from its own server (honeypot + rate limit done there)
+      // and proves it with a shared secret, so its forms need no checkbox. Until
+      // 23 Nov 2026 every website contact form was refused right here, silently:
+      // the website never sent a token and never looked at the answer.
+      // The secret lives in server_settings (migration 090: service role only).
+      const sentSecret = req.headers.get("x-website-secret") || "";
+      let trustedWebsite = false;
+      if (sentSecret.length >= 24) {
+        const envSecret = Deno.env.get("WEBSITE_FORMS_SECRET");
+        if (envSecret && sentSecret === envSecret) trustedWebsite = true;
+        else {
+          const { data: row } = await supabase.from("server_settings").select("value").eq("key", "website_forms_secret").maybeSingle();
+          trustedWebsite = !!row?.value && row.value === sentSecret;
+        }
+      }
       const rcSecret = Deno.env.get("RECAPTCHA_SECRET_KEY");
-      if (rcSecret) {
+      if (rcSecret && !trustedWebsite) {
         const rres = await fetch("https://www.google.com/recaptcha/api/siteverify", {
           method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({ secret: rcSecret, response: String(body.recaptcha_token || "") }),
